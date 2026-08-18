@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Builds ESI Proxy.app — required on macOS for eveauth-proxy:// login to
+# work at all: Launch Services can only route a custom URL scheme to a
+# proper .app bundle (CFBundleURLTypes in Info.plist), never to a bare
+# binary. `go build -o esi-proxy ./cmd/esi-proxy && ./esi-proxy` still runs
+# fine for everything else, but SSO login will fail until it's launched via
+# this bundle at least once.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+APP_NAME="ESI Proxy"
+APP_DIR="${APP_NAME}.app"
+BUNDLE_ID="dev.bos-development.esi-proxy"
+
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR/Contents/MacOS"
+
+go build -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
+
+cat > "$APP_DIR/Contents/Info.plist" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>${APP_NAME}</string>
+	<key>CFBundleIdentifier</key>
+	<string>${BUNDLE_ID}</string>
+	<key>CFBundleExecutable</key>
+	<string>esi-proxy</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>${BUNDLE_ID}.auth-callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>eveauth-proxy</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
+PLIST
+
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+"$LSREGISTER" -f "$PWD/$APP_DIR"
+
+echo "Built $APP_DIR and registered it for eveauth-proxy:// with Launch Services."
+echo "Run it with: open \"$APP_DIR\""
