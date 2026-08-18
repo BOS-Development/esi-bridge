@@ -1,0 +1,24 @@
+# Build artifacts
+/esi-proxy
+/*.app
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/dist/
+/bin/
+
+# Go
+*.test
+*.out
+vendor/
+
+# macOS
+.DS_Store
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+.claude/
