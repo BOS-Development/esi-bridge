@@ -13,7 +13,12 @@ import (
 // registered at developers.eveonline.com (redirect URI must point at
 // http://localhost:<Port>/sso/callback).
 type Config struct {
-	Port          int    `json:"port"`
+	Port int `json:"port"`
+	// BindHost is the host the HTTP server binds to. The default,
+	// "localhost", keeps the token-holding proxy reachable only from this
+	// machine; set it to "0.0.0.0" (or a specific LAN address) to let other
+	// machines on the network connect to the proxy they discover over mDNS.
+	BindHost      string `json:"bind_host"`
 	DataDir       string `json:"data_dir"`
 	EVEClientID   string `json:"eve_client_id"`
 	EVESSOBaseURL string `json:"eve_sso_base_url"`
@@ -23,6 +28,7 @@ type Config struct {
 func defaults(dataDir string) Config {
 	return Config{
 		Port:          8085,
+		BindHost:      "localhost",
 		DataDir:       dataDir,
 		EVEClientID:   "",
 		EVESSOBaseURL: "https://login.eveonline.com",
@@ -67,6 +73,9 @@ func Load(dir string) (Config, error) {
 	}
 	if cfg.DataDir == "" {
 		cfg.DataDir = dir
+	}
+	if cfg.BindHost == "" {
+		cfg.BindHost = "localhost"
 	}
 	return cfg, nil
 }

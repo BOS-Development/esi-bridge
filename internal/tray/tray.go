@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 	"time"
 
@@ -23,6 +24,13 @@ type Tray struct {
 	srv  *server.Server
 	log  *slog.Logger
 	port int
+
+	// status is the disabled menu item (and tooltip) showing where the proxy
+	// is reachable. effectiveHost is the host actually bound this run; the
+	// bind only changes on restart, so a displayed host that differs from it
+	// is shown as "(after restart)" rather than claimed as already live.
+	status        *systray.MenuItem
+	effectiveHost string
 
 	// onCocoaReady, if set, is called once at the start of onReady — after
 	// the native event loop (and on macOS, NSApplication's own startup) has
@@ -98,18 +106,33 @@ func (t *Tray) onReady(ctx context.Context) {
 		t.onCocoaReady()
 	}
 
+	bindHost, err := t.srv.BindHost()
+	if err != nil {
+		t.log.Error("read bind host", "error", err)
+		bindHost = "localhost"
+	}
+	t.effectiveHost = t.displayHost(bindHost)
+
 	systray.SetIcon(icon())
 	systray.SetTitle("ESI Proxy")
-	systray.SetTooltip(fmt.Sprintf("ESI Proxy — running on localhost:%d", t.port))
 
-	status := systray.AddMenuItem(fmt.Sprintf("Running on localhost:%d", t.port), "")
-	status.Disable()
+	t.status = systray.AddMenuItem("", "")
+	t.status.Disable()
+	t.setAddressDisplay(t.effectiveHost)
 	systray.AddSeparator()
 
 	setClientID := systray.AddMenuItem("Set EVE Client ID", "Configure the EVE SSO application this proxy uses")
 	go func() {
 		for range setClientID.ClickedCh {
 			t.onSetClientID()
+		}
+	}()
+
+	lanAccess := systray.AddMenuItemCheckbox("Allow LAN Access",
+		"Let other machines on your network connect to this proxy (takes effect on restart)", isLANBind(bindHost))
+	go func() {
+		for range lanAccess.ClickedCh {
+			t.onToggleLANAccess(lanAccess)
 		}
 	}()
 
@@ -176,6 +199,86 @@ func (t *Tray) onSetClientID() {
 	if err := openBrowser(url); err != nil {
 		t.log.Error("open browser for client id setup", "error", err, "url", url)
 	}
+}
+
+// onToggleLANAccess flips the configured bind host between localhost-only and
+// all-interfaces and persists it. The running listener is already bound, so
+// the change is advisory until the next restart — the notification says so.
+func (t *Tray) onToggleLANAccess(item *systray.MenuItem) {
+	enable := !item.Checked()
+
+	host := "localhost"
+	if enable {
+		host = "0.0.0.0"
+	}
+	if err := t.srv.SetBindHost(host); err != nil {
+		t.log.Error("set bind host", "error", err)
+		return
+	}
+
+	if enable {
+		item.Check()
+		t.setAddressDisplay(localIP())
+		notify.Send(t.log, "esi-proxy: LAN access enabled",
+			"Other machines can connect once you restart esi-proxy.")
+	} else {
+		item.Uncheck()
+		t.setAddressDisplay("localhost")
+		notify.Send(t.log, "esi-proxy: LAN access disabled",
+			"Proxy will bind to localhost only once you restart esi-proxy.")
+	}
+}
+
+// setAddressDisplay updates the status menu item and tooltip to show where
+// the proxy is reachable. A host that differs from the one bound this run is
+// marked "(after restart)", since the listener's bind only changes on
+// restart and the menu must not claim an address that isn't live yet.
+func (t *Tray) setAddressDisplay(host string) {
+	addr := fmt.Sprintf("%s:%d", host, t.port)
+	suffix := ""
+	if host != t.effectiveHost {
+		suffix = " (after restart)"
+	}
+	t.status.SetTitle("Running on " + addr + suffix)
+	systray.SetTooltip("ESI Proxy — running on " + addr + suffix)
+}
+
+// displayHost maps a configured bind host to the address worth showing the
+// user: a LAN bind is shown as this machine's actual LAN IP (what another
+// machine would connect to), everything else as localhost.
+func (t *Tray) displayHost(bindHost string) string {
+	if isLANBind(bindHost) {
+		return localIP()
+	}
+	return "localhost"
+}
+
+// isLANBind reports whether host exposes the proxy beyond this machine.
+// Loopback names bind same-machine only; anything else (0.0.0.0, a LAN IP)
+// is reachable from the network.
+func isLANBind(host string) bool {
+	switch host {
+	case "", "localhost", "127.0.0.1", "::1", "[::1]":
+		return false
+	default:
+		return true
+	}
+}
+
+// localIP returns this machine's primary outbound IPv4 address by inspecting
+// the route to a public address. No packets are sent — a UDP "connection"
+// only resolves the local interface — so this works offline-ish and without
+// opening the network. Falls back to "localhost" if no route is found.
+func localIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "localhost"
+	}
+	defer conn.Close()
+	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+		return addr.IP.String()
+	}
+	return "localhost"
 }
 
 func (t *Tray) onAddCharacter() {
