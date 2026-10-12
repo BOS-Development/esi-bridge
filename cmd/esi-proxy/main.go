@@ -19,6 +19,7 @@ import (
 	"github.com/BOS-Development/esi-proxy/internal/config"
 	"github.com/BOS-Development/esi-proxy/internal/cryptox"
 	"github.com/BOS-Development/esi-proxy/internal/db"
+	"github.com/BOS-Development/esi-proxy/internal/discovery"
 	"github.com/BOS-Development/esi-proxy/internal/esi"
 	"github.com/BOS-Development/esi-proxy/internal/server"
 	"github.com/BOS-Development/esi-proxy/internal/store"
@@ -149,7 +150,7 @@ func run(log *slog.Logger) error {
 	srv := server.New(st, sso, esiClient, respCache, tokenMgr, log, cfg.DataDir, cfg.EVESSOBaseURL, redirectURL)
 
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf("localhost:%d", cfg.Port),
+		Addr:    fmt.Sprintf("%s:%d", cfg.BindHost, cfg.Port),
 		Handler: srv.Handler(),
 	}
 
@@ -162,6 +163,15 @@ func run(log *slog.Logger) error {
 			log.Error("http server", "error", err)
 		}
 	}()
+
+	// Advertise over mDNS so external apps (Pyfa, MCO, …) can discover the
+	// proxy without a hand-configured host:port. Best-effort: a host without
+	// working multicast just isn't auto-discoverable — see internal/discovery.
+	if stopAdvertise, err := discovery.Advertise(log, cfg.Port, advertiseURL(cfg.BindHost, cfg.Port)); err != nil {
+		log.Warn("mdns advertising unavailable", "error", err)
+	} else {
+		defer stopAdvertise()
+	}
 
 	go worker.RunTokenRefresh(ctx, st, tokenMgr, log)
 
@@ -196,6 +206,24 @@ func run(log *slog.Logger) error {
 	_ = httpServer.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// advertiseURL builds the connect URL published in the mDNS TXT record.
+// When bound to localhost the proxy is reachable only from this machine, so
+// clients must use localhost; the mDNS A record's LAN address would not
+// connect. When bound to all interfaces we advertise the host's mDNS name
+// (hostname.local), which the same responder resolves for LAN peers. A
+// specific bind address is advertised as-is.
+func advertiseURL(bindHost string, port int) string {
+	host := bindHost
+	switch bindHost {
+	case "", "0.0.0.0", "::", "[::]":
+		host = "localhost"
+		if h, err := os.Hostname(); err == nil && h != "" {
+			host = strings.TrimSuffix(h, ".local") + ".local"
+		}
+	}
+	return fmt.Sprintf("http://%s:%d", host, port)
 }
 
 func sweepCache(ctx context.Context, c *cache.Cache) {
