@@ -244,13 +244,18 @@ func (t *Tray) setAddressDisplay(host string) {
 }
 
 // displayHost maps a configured bind host to the address worth showing the
-// user: a LAN bind is shown as this machine's actual LAN IP (what another
-// machine would connect to), everything else as localhost.
+// user. A wildcard bind is shown as this machine's actual LAN IP (what
+// another machine would connect to); a loopback bind as localhost; and a
+// specific interface IP verbatim. This mirrors advertiseURL in cmd/esi-proxy.
 func (t *Tray) displayHost(bindHost string) string {
-	if isLANBind(bindHost) {
+	switch bindHost {
+	case "", "0.0.0.0", "::", "[::]":
 		return localIP()
+	case "localhost", "127.0.0.1", "::1", "[::1]":
+		return "localhost"
+	default:
+		return bindHost
 	}
-	return "localhost"
 }
 
 // isLANBind reports whether host exposes the proxy beyond this machine.
