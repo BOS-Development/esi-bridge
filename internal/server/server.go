@@ -90,9 +90,9 @@ func (s *Server) BindHost() (string, error) {
 	return cfg.BindHost, nil
 }
 
-// SetBindHost persists a new bind host to config.json. Unlike SetClientID
-// this does NOT take effect immediately: the HTTP listener is bound once at
-// startup, so the change applies on the next restart.
+// SetBindHost persists a new bind host to config.json. It only saves the
+// setting: the listener itself is rebound live by the caller (see the
+// network type in cmd/esi-proxy), which calls this once the rebind succeeds.
 func (s *Server) SetBindHost(host string) error {
 	s.cfgMu.Lock()
 	defer s.cfgMu.Unlock()

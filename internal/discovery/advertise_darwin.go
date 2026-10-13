@@ -15,6 +15,7 @@ import "C"
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 	"unsafe"
 )
@@ -22,8 +23,9 @@ import (
 // Advertise registers the service with the macOS system responder
 // (mDNSResponder) through the Bonjour C API. The registration stays live for
 // as long as the returned DNSServiceRef connection is open, so the shutdown
-// func deallocates it to withdraw the service.
-func Advertise(log *slog.Logger, port int, baseURL string) (func(), error) {
+// func deallocates it to withdraw the service. ip is unused: mDNSResponder
+// publishes this host's own address on each interface it answers on.
+func Advertise(log *slog.Logger, port int, baseURL string, ip net.IP) (func(), error) {
 	instance := instanceName()
 
 	cName := C.CString(instance)

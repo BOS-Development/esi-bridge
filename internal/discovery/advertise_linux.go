@@ -5,6 +5,7 @@ package discovery
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -20,8 +21,9 @@ const (
 // Advertise registers the service with the Avahi daemon over the system
 // D-Bus, so it's published by the host's own mDNS responder and visible to
 // avahi-browse and to other devices. The shutdown func frees the entry group
-// and closes the bus connection, withdrawing the service.
-func Advertise(log *slog.Logger, port int, baseURL string) (func(), error) {
+// and closes the bus connection, withdrawing the service. ip is unused: Avahi
+// publishes this host's own address on each interface it answers on.
+func Advertise(log *slog.Logger, port int, baseURL string, ip net.IP) (func(), error) {
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil, fmt.Errorf("connect to system d-bus: %w", err)
