@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -72,6 +73,7 @@ func isFlag(s string) bool { return len(s) > 0 && s[0] == '-' }
 func mdnsAnnounce(log *slog.Logger, port int, baseURL string, duration time.Duration) error {
 	// Fill in whatever wasn't overridden from the saved config, so by default
 	// this announces exactly what the running app would.
+	var ip net.IP
 	if port == 0 || baseURL == "" {
 		dataDir, err := config.Dir()
 		if err != nil {
@@ -85,11 +87,15 @@ func mdnsAnnounce(log *slog.Logger, port int, baseURL string, duration time.Dura
 			port = cfg.Port
 		}
 		if baseURL == "" {
-			baseURL = advertiseURL(cfg.BindHost, port)
+			var lanIP net.IP
+			if isWildcard(cfg.BindHost) {
+				lanIP = discovery.LANIP()
+			}
+			baseURL, ip = connectTarget(cfg.BindHost, port, lanIP)
 		}
 	}
 
-	stop, err := discovery.Advertise(log, port, baseURL)
+	stop, err := discovery.Advertise(log, port, baseURL, ip)
 	if err != nil {
 		return fmt.Errorf("advertise: %w", err)
 	}

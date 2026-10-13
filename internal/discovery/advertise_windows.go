@@ -3,10 +3,14 @@
 package discovery
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log/slog"
+	"net"
+	"runtime"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -40,17 +44,53 @@ type dnsServiceRegisterRequest struct {
 
 const dnsQueryRequestVersion1 = 1
 
-// DnsServiceRegister returns this (DNS_REQUEST_PENDING) when the async
-// registration has been accepted and will complete via the callback.
+// DnsServiceRegister/DeRegister return this (DNS_REQUEST_PENDING) when the
+// async request has been accepted and will complete via the callback.
 const dnsRequestPending = 9506
 
-// noopRegisterComplete is the required completion callback; we don't act on
-// the result beyond keeping the registration alive for the process lifetime.
-var noopRegisterComplete = windows.NewCallback(func(status uint32, ctx uintptr, instance uintptr) uintptr {
+// deregisterTimeout bounds how long withdrawing the service waits for the
+// responder to confirm. The instance can't be freed, nor the same name
+// safely re-registered, until it does.
+const deregisterTimeout = 3 * time.Second
+
+// Completion callbacks are a limited process-wide resource
+// (windows.NewCallback never frees them), so every request shares this one
+// and is told apart by its QueryContext, which keys a waiting channel.
+var (
+	pendingMu   sync.Mutex
+	pending     = map[uintptr]chan uint32{}
+	nextPending uintptr
+)
+
+var registerComplete = windows.NewCallback(func(status uint32, ctx uintptr, instance uintptr) uintptr {
+	pendingMu.Lock()
+	ch := pending[ctx]
+	delete(pending, ctx)
+	pendingMu.Unlock()
+	if ch != nil {
+		ch <- status
+	}
 	return 0
 })
 
-func Advertise(log *slog.Logger, port int, baseURL string) (func(), error) {
+// newPending allocates a QueryContext and the channel its completion
+// status is delivered on.
+func newPending() (uintptr, chan uint32) {
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	nextPending++
+	ch := make(chan uint32, 1)
+	pending[nextPending] = ch
+	return nextPending, ch
+}
+
+func dropPending(ctx uintptr) {
+	pendingMu.Lock()
+	delete(pending, ctx)
+	pendingMu.Unlock()
+}
+
+func Advertise(log *slog.Logger, port int, baseURL string, ip net.IP) (func(), error) {
 	instance := instanceName()
 	serviceName := instance + "." + ServiceType + ".local"
 
@@ -80,10 +120,20 @@ func Advertise(log *slog.Logger, port int, baseURL string) (func(), error) {
 		valuesPtr = unsafe.Pointer(&values[0])
 	}
 
+	// IP4_ADDRESS is a DWORD holding the address in network byte order, i.e.
+	// the four address bytes as they sit in memory. With no address given,
+	// the A record is left to the responder to fill in from the host name.
+	var ip4 uint32
+	var ip4Ptr unsafe.Pointer
+	if v4 := ip.To4(); v4 != nil {
+		ip4 = binary.LittleEndian.Uint32(v4)
+		ip4Ptr = unsafe.Pointer(&ip4)
+	}
+
 	ret, _, _ := procDnsServiceConstruct.Call(
 		uintptr(unsafe.Pointer(serviceNameW)),
 		uintptr(unsafe.Pointer(hostNameW)),
-		0, // pIp4: resolved from host name
+		uintptr(ip4Ptr),
 		0, // pIp6
 		uintptr(uint16(port)),
 		0, // priority
@@ -97,30 +147,61 @@ func Advertise(log *slog.Logger, port int, baseURL string) (func(), error) {
 	}
 	instancePtr := ret
 
-	req := dnsServiceRegisterRequest{
+	// The request is heap-allocated and referenced by the shutdown func so it
+	// stays valid for as long as the responder may use it.
+	regCtx, regDone := newPending()
+	req := &dnsServiceRegisterRequest{
 		Version:            dnsQueryRequestVersion1,
 		ServiceInstance:    instancePtr,
-		CompletionCallback: noopRegisterComplete,
+		CompletionCallback: registerComplete,
+		QueryContext:       regCtx,
 	}
-	rc, _, _ := procDnsServiceRegister.Call(uintptr(unsafe.Pointer(&req)), 0)
-	if rc != dnsRequestPending && rc != 0 {
-		procDnsServiceFreeInstance.Call(instancePtr)
-		return nil, fmt.Errorf("DnsServiceRegister failed: status %d", rc)
+	rc, _, _ := procDnsServiceRegister.Call(uintptr(unsafe.Pointer(req)), 0)
+	if rc != dnsRequestPending {
+		dropPending(regCtx)
+		if rc != 0 {
+			procDnsServiceFreeInstance.Call(instancePtr)
+			return nil, fmt.Errorf("DnsServiceRegister failed: status %d", rc)
+		}
+	} else {
+		go func() {
+			if status := <-regDone; status != 0 {
+				log.Warn("mdns registration failed", "instance", instance, "status", status)
+			}
+		}()
 	}
 
 	log.Info("mdns advertising (system responder)",
-		"service", ServiceType, "instance", instance, "base_url", baseURL)
+		"service", ServiceType, "instance", instance, "base_url", baseURL, "ip", ip)
 
 	var once sync.Once
 	return func() {
 		once.Do(func() {
-			dereg := dnsServiceRegisterRequest{
+			deregCtx, deregDone := newPending()
+			dereg := &dnsServiceRegisterRequest{
 				Version:            dnsQueryRequestVersion1,
 				ServiceInstance:    instancePtr,
-				CompletionCallback: noopRegisterComplete,
+				CompletionCallback: registerComplete,
+				QueryContext:       deregCtx,
 			}
-			procDnsServiceDeRegister.Call(uintptr(unsafe.Pointer(&dereg)), 0)
+			rc, _, _ := procDnsServiceDeRegister.Call(uintptr(unsafe.Pointer(dereg)), 0)
+			if rc == dnsRequestPending {
+				select {
+				case <-deregDone:
+				case <-time.After(deregisterTimeout):
+					// Leak the instance rather than free memory the
+					// responder may still touch.
+					dropPending(deregCtx)
+					log.Warn("mdns deregistration timed out", "instance", instance)
+					runtime.KeepAlive(req)
+					return
+				}
+			} else {
+				dropPending(deregCtx)
+			}
 			procDnsServiceFreeInstance.Call(instancePtr)
+			runtime.KeepAlive(req)
+			runtime.KeepAlive(dereg)
 		})
 	}, nil
 }

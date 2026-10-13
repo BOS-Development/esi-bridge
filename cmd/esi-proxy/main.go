@@ -19,7 +19,6 @@ import (
 	"github.com/BOS-Development/esi-proxy/internal/config"
 	"github.com/BOS-Development/esi-proxy/internal/cryptox"
 	"github.com/BOS-Development/esi-proxy/internal/db"
-	"github.com/BOS-Development/esi-proxy/internal/discovery"
 	"github.com/BOS-Development/esi-proxy/internal/esi"
 	"github.com/BOS-Development/esi-proxy/internal/server"
 	"github.com/BOS-Development/esi-proxy/internal/store"
@@ -157,28 +156,15 @@ func run(log *slog.Logger) error {
 
 	srv := server.New(st, sso, esiClient, respCache, tokenMgr, log, cfg.DataDir, cfg.EVESSOBaseURL, redirectURL)
 
-	httpServer := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", cfg.BindHost, cfg.Port),
-		Handler: srv.Handler(),
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go func() {
-		log.Info("http server listening", "addr", httpServer.Addr)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("http server", "error", err)
-		}
-	}()
-
-	// Advertise over mDNS so external apps (Pyfa, MCO, …) can discover the
-	// proxy without a hand-configured host:port. Best-effort: a host without
-	// working multicast just isn't auto-discoverable — see internal/discovery.
-	if stopAdvertise, err := discovery.Advertise(log, cfg.Port, advertiseURL(cfg.BindHost, cfg.Port)); err != nil {
-		log.Warn("mdns advertising unavailable", "error", err)
-	} else {
-		defer stopAdvertise()
+	// netw owns the HTTP listener and the mDNS advert, which lets external
+	// apps (Pyfa, MCO, …) discover the proxy without a hand-configured
+	// host:port. It rebinds both live when LAN access is toggled in the tray.
+	netw := newNetwork(log, cfg.Port, srv.Handler(), srv.SetBindHost)
+	if err := netw.Start(ctx, cfg.BindHost); err != nil {
+		log.Error("http server", "error", err)
 	}
 
 	go worker.RunTokenRefresh(ctx, st, tokenMgr, log)
@@ -207,31 +193,13 @@ func run(log *slog.Logger) error {
 	// init()), and on macOS Cocoa's run loop only works on that thread.
 	// Quitting the tray (Quit clicked, or ctx canceled) is what unblocks
 	// this call; shutdown continues below once it returns.
-	tray.New(st, srv, log, cfg.Port, onCocoaReady).Run(ctx)
+	tray.New(st, srv, netw, log, cfg.Port, onCocoaReady).Run(ctx)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = httpServer.Shutdown(shutdownCtx)
+	netw.Shutdown(shutdownCtx)
 
 	return nil
-}
-
-// advertiseURL builds the connect URL published in the mDNS TXT record.
-// When bound to localhost the proxy is reachable only from this machine, so
-// clients must use localhost; the mDNS A record's LAN address would not
-// connect. When bound to all interfaces we advertise the host's mDNS name
-// (hostname.local), which the same responder resolves for LAN peers. A
-// specific bind address is advertised as-is.
-func advertiseURL(bindHost string, port int) string {
-	host := bindHost
-	switch bindHost {
-	case "", "0.0.0.0", "::", "[::]":
-		host = "localhost"
-		if h, err := os.Hostname(); err == nil && h != "" {
-			host = strings.TrimSuffix(h, ".local") + ".local"
-		}
-	}
-	return fmt.Sprintf("http://%s:%d", host, port)
 }
 
 func sweepCache(ctx context.Context, c *cache.Cache) {
