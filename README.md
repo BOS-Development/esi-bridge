@@ -44,10 +44,17 @@ Copy the generated **Client ID**.
 
 ### 2. Build and run
 
-**Windows / Linux:**
+**Windows:**
+
+```powershell
+.\scripts\build-windows.ps1
+.\esi-proxy.exe
+```
+
+**Linux:**
 
 ```sh
-go build -o esi-proxy ./cmd/esi-proxy
+./scripts/build-linux.sh
 ./esi-proxy
 ```
 
@@ -59,6 +66,8 @@ open "ESI Proxy.app"
 ```
 
 (`go build -o esi-proxy ./cmd/esi-proxy && ./esi-proxy` still works fine on macOS for everything *except* SSO login, which needs the bundle.)
+
+The Windows and Linux scripts are thin wrappers around `go build -o esi-proxy[.exe] ./cmd/esi-proxy` — feel free to invoke that directly instead.
 
 A tray icon appears. Click **Set EVE Client ID** — it opens a small local page in your browser to paste in the Client ID from step 1; it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt before handing off to the app — that's expected custom-scheme behavior, not a bug, and afterwards you'll get a desktop notification confirming the character was added (the browser tab itself can't show much once the handoff happens).
 
