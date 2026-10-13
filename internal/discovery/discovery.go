@@ -1,46 +1,43 @@
-// Package discovery advertises the running proxy on the local network via
-// mDNS / DNS-SD (the _esi-proxy._tcp service) so external applications can
-// find it without the user hand-configuring a host:port.
+// Package discovery advertises the proxy on the local network using the host
+// OS's own mDNS/DNS-SD responder — Bonjour (mDNSResponder) on macOS, Avahi on
+// Linux, and the DNS-SD API on Windows. Registering with the system responder
+// is what makes the service visible to the OS's own tooling (e.g. dns-sd) and
+// to other devices on the network; an in-process, second responder is not.
+// Per-OS registration lives in advertise_<goos>.go; Advertise has the same
+// signature on every platform.
 package discovery
 
 import (
-	"fmt"
-	"log/slog"
 	"os"
-
-	"github.com/grandcat/zeroconf"
+	"strings"
 )
 
 // ServiceType is the DNS-SD service type external applications browse for.
 const ServiceType = "_esi-proxy._tcp"
 
-// Advertise registers the proxy as an mDNS service and returns a shutdown
-// func that deregisters it. baseURL is the URL clients should actually
-// connect to; it is published in a TXT record because when the server binds
-// localhost only, the address in the mDNS A record is not reachable and the
-// TXT value is the authoritative connect URL.
-//
-// Advertising is best-effort: on a host without working multicast this
-// returns an error, which the caller logs rather than treating as fatal —
-// the proxy still serves requests, it just isn't auto-discoverable.
-func Advertise(log *slog.Logger, port int, baseURL string) (func(), error) {
-	instance := "ESI Proxy"
+// instanceName is the human-readable DNS-SD instance name, e.g.
+// "ESI Proxy (studio)".
+func instanceName() string {
 	if host, err := os.Hostname(); err == nil && host != "" {
-		instance = fmt.Sprintf("ESI Proxy (%s)", host)
+		return "ESI Proxy (" + shortHost(host) + ")"
 	}
+	return "ESI Proxy"
+}
 
-	txt := []string{
-		"base_url=" + baseURL,
-		"path=/",
+// shortHost trims a FQDN down to its first label, so a long name (such as a
+// Tailscale "machine.tailnet.ts.net") doesn't bloat the advertised instance
+// name.
+func shortHost(h string) string {
+	if i := strings.IndexByte(h, '.'); i > 0 {
+		return h[:i]
 	}
+	return h
+}
 
-	server, err := zeroconf.Register(instance, ServiceType, "local.", port, txt, nil)
-	if err != nil {
-		return nil, fmt.Errorf("register mdns service: %w", err)
-	}
-
-	log.Info("mdns advertising",
-		"service", ServiceType, "instance", instance, "base_url", baseURL)
-
-	return server.Shutdown, nil
+// txtRecords is the fixed set of DNS-SD TXT entries the proxy advertises.
+// base_url is the authoritative URL clients should connect to (the SRV/A
+// records may point at an address that isn't reachable under a localhost
+// bind), and path is the base request path.
+func txtRecords(baseURL string) []string {
+	return []string{"base_url=" + baseURL, "path=/"}
 }
