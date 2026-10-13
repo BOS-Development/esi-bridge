@@ -59,6 +59,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "mdns":
+			if err := runMDNS(os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "mdns:", err)
+				os.Exit(1)
+			}
+			return
 		case "-h", "--help", "help":
 			printUsage()
 			return
@@ -78,6 +84,8 @@ Usage:
   esi-proxy                                  run the proxy (tray + HTTP server)
   esi-proxy export --out=bundle.enc          export accounts/characters/tokens
   esi-proxy import --in=bundle.enc           import a bundle onto this machine
+  esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
+  esi-proxy mdns browse   [--duration D]     debug: discover esi-proxy services on the LAN
   esi-proxy eveauth-proxy://callback?...     internal: invoked by the OS to deliver
                                               an SSO callback to the running instance`)
 }
@@ -148,20 +156,16 @@ func run(log *slog.Logger) error {
 
 	srv := server.New(st, sso, esiClient, respCache, tokenMgr, log, cfg.DataDir, cfg.EVESSOBaseURL, redirectURL)
 
-	httpServer := &http.Server{
-		Addr:    fmt.Sprintf("localhost:%d", cfg.Port),
-		Handler: srv.Handler(),
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go func() {
-		log.Info("http server listening", "addr", httpServer.Addr)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("http server", "error", err)
-		}
-	}()
+	// netw owns the HTTP listener and the mDNS advert, which lets external
+	// apps (Pyfa, MCO, …) discover the proxy without a hand-configured
+	// host:port. It rebinds both live when LAN access is toggled in the tray.
+	netw := newNetwork(log, cfg.Port, srv.Handler(), srv.SetBindHost)
+	if err := netw.Start(ctx, cfg.BindHost); err != nil {
+		log.Error("http server", "error", err)
+	}
 
 	go worker.RunTokenRefresh(ctx, st, tokenMgr, log)
 
@@ -189,11 +193,11 @@ func run(log *slog.Logger) error {
 	// init()), and on macOS Cocoa's run loop only works on that thread.
 	// Quitting the tray (Quit clicked, or ctx canceled) is what unblocks
 	// this call; shutdown continues below once it returns.
-	tray.New(st, srv, log, cfg.Port, onCocoaReady).Run(ctx)
+	tray.New(st, srv, netw, log, cfg.Port, onCocoaReady).Run(ctx)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = httpServer.Shutdown(shutdownCtx)
+	netw.Shutdown(shutdownCtx)
 
 	return nil
 }

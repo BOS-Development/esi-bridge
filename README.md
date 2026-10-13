@@ -75,6 +75,8 @@ A tray icon appears. Click **Set EVE Client ID** — it opens a small local page
 
 ### 3. Point an external application at the proxy
 
+The proxy listens on `localhost:8085` by default. An app can either use that address directly, or discover it over mDNS (see [Discovery & network access](#discovery--network-access) below) so the user never has to type a host:port.
+
 1. The app registers itself: `POST http://localhost:8085/api/register {"name": "Pyfa"}` → returns an `api_key`.
 2. To discover characters/accounts rather than being told a character_id out of band, the app requests app-wide permissions: `POST http://localhost:8085/api/request-permissions` with header `X-Proxy-Api-Key: <api_key>` and body `{"permissions": ["list_characters", "list_accounts"]}`. Approve or deny each from the tray's **Permission Requests** menu.
    * `list_characters` unlocks `GET /api/characters` returning every character on the proxy (id + name) instead of just ones it already has a per-character grant for.
@@ -82,6 +84,25 @@ A tray icon appears. Click **Set EVE Client ID** — it opens a small local page
 3. The app requests access to a specific character: `POST http://localhost:8085/api/request-access` with the same header and body `{"character_id": 12345, "scopes": [...]}`.
 4. Approve or deny that request from the tray's **Pending Approvals** menu.
 5. The app then calls ESI through the proxy: `GET http://localhost:8085/proxy/12345/<esi-path>` with the same `X-Proxy-Api-Key` header. It can check its current character-level access at any time via `GET /api/grants` (id, name, and the specific scopes granted).
+
+### Discovery & network access
+
+So that external apps don't have to hard-code `localhost:8085`, the proxy advertises itself on the local network over **mDNS / DNS-SD** (the same "Bonjour"/Zeroconf mechanism printers use) while it's running.
+
+* **Service type:** `_esi-proxy._tcp` (domain `local.`)
+* **TXT records:**
+  * `base_url` — the URL the app should actually connect to, e.g. `http://localhost:8085`. **Use this value directly; don't rebuild the URL from the resolved A record.** When the proxy is bound to localhost (the default), the LAN address in the A record isn't reachable — `base_url` is the authoritative answer.
+  * `path` — the base path (currently `/`).
+
+An app discovers the proxy by browsing for `_esi-proxy._tcp` and reading `base_url`; everything in step 3 then proceeds against that URL. If the host has no working multicast, advertising is skipped (logged as a warning) and the proxy still works — apps just fall back to the default address.
+
+#### Letting other machines connect (LAN access)
+
+By default the proxy binds to `localhost`, so only applications **on the same machine** can connect — the token-holding proxy stays off the network. To let other machines on your LAN connect to a proxy they discover, enable **Allow LAN Access** in the tray menu. This binds to all interfaces and advertises your machine's LAN IP (e.g. `http://192.168.1.20:8085`) in `base_url` instead of `localhost`, falling back to `hostname.local` if no LAN address is found.
+
+**Toggling LAN access takes effect immediately** — no restart. The listener is rebound and the mDNS advert re-registered on the spot; turning it off also disconnects machines already connected over the LAN (in-flight requests get a few seconds to finish). While LAN access is on, the proxy re-checks its LAN IP every 30 seconds and updates the advert if it changes (e.g. after a DHCP renewal or switching networks). You can also set it directly in `config.json` via `"bind_host"`: `"localhost"` (default, same-machine only), `"0.0.0.0"` (all interfaces), or a specific interface IP — edits there are picked up on the next start.
+
+> **Note:** exposing the proxy to the LAN means any machine that can reach it can drive the app-registration/approval flow, so only enable it on networks you trust, and keep an eye on the tray's **Pending Approvals** and **Permission Requests** when you do.
 
 ### Copying tokens to another computer
 

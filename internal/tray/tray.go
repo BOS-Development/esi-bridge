@@ -18,11 +18,31 @@ import (
 
 const refreshInterval = 3 * time.Second
 
+// Network is the live HTTP listener and mDNS advert, which the LAN access
+// toggle rebinds without a restart.
+type Network interface {
+	// BindHost is the host the listener is bound to right now.
+	BindHost() string
+	// SetBindHost rebinds the listener and re-advertises; on error the
+	// previous bind is still in effect.
+	SetBindHost(host string) error
+	// Address is the host:port other applications should connect to. It
+	// can change on its own, e.g. when the machine's LAN IP does.
+	Address() string
+}
+
 type Tray struct {
-	st   *store.Store
-	srv  *server.Server
-	log  *slog.Logger
-	port int
+	st      *store.Store
+	srv     *server.Server
+	network Network
+	log     *slog.Logger
+	port    int
+
+	// status is the disabled menu item (and tooltip) showing where the proxy
+	// is reachable; shownAddr is what it currently says, so the periodic
+	// refresh only touches it when the address actually changes.
+	status    *systray.MenuItem
+	shownAddr string
 
 	// onCocoaReady, if set, is called once at the start of onReady — after
 	// the native event loop (and on macOS, NSApplication's own startup) has
@@ -71,10 +91,11 @@ type permGrantChild struct {
 	applicationID int64
 }
 
-func New(st *store.Store, srv *server.Server, log *slog.Logger, port int, onCocoaReady func()) *Tray {
+func New(st *store.Store, srv *server.Server, network Network, log *slog.Logger, port int, onCocoaReady func()) *Tray {
 	return &Tray{
 		st:                st,
 		srv:               srv,
+		network:           network,
 		log:               log,
 		port:              port,
 		onCocoaReady:      onCocoaReady,
@@ -100,16 +121,24 @@ func (t *Tray) onReady(ctx context.Context) {
 
 	systray.SetIcon(icon())
 	systray.SetTitle("ESI Proxy")
-	systray.SetTooltip(fmt.Sprintf("ESI Proxy — running on localhost:%d", t.port))
 
-	status := systray.AddMenuItem(fmt.Sprintf("Running on localhost:%d", t.port), "")
-	status.Disable()
+	t.status = systray.AddMenuItem("", "")
+	t.status.Disable()
+	t.updateAddressDisplay()
 	systray.AddSeparator()
 
 	setClientID := systray.AddMenuItem("Set EVE Client ID", "Configure the EVE SSO application this proxy uses")
 	go func() {
 		for range setClientID.ClickedCh {
 			t.onSetClientID()
+		}
+	}()
+
+	lanAccess := systray.AddMenuItemCheckbox("Allow LAN Access",
+		"Let other machines on your network connect to this proxy", isLANBind(t.network.BindHost()))
+	go func() {
+		for range lanAccess.ClickedCh {
+			t.onToggleLANAccess(lanAccess)
 		}
 	}()
 
@@ -178,6 +207,61 @@ func (t *Tray) onSetClientID() {
 	}
 }
 
+// onToggleLANAccess flips the bind host between localhost-only and
+// all-interfaces. The listener is rebound and the mDNS advert updated
+// immediately, and the choice is saved for future runs.
+func (t *Tray) onToggleLANAccess(item *systray.MenuItem) {
+	enable := !item.Checked()
+
+	host := "localhost"
+	if enable {
+		host = "0.0.0.0"
+	}
+	if err := t.network.SetBindHost(host); err != nil {
+		t.log.Error("set bind host", "error", err)
+		notify.Send(t.log, "esi-proxy: couldn't change LAN access", err.Error())
+		return
+	}
+
+	t.updateAddressDisplay()
+	if enable {
+		item.Check()
+		notify.Send(t.log, "esi-proxy: LAN access enabled",
+			"Other machines on your network can now connect at "+t.shownAddr+".")
+	} else {
+		item.Uncheck()
+		notify.Send(t.log, "esi-proxy: LAN access disabled",
+			"The proxy is now reachable from this machine only.")
+	}
+}
+
+// updateAddressDisplay updates the status menu item and tooltip to show
+// where the proxy is reachable, if that has changed since last shown.
+func (t *Tray) updateAddressDisplay() {
+	addr := t.network.Address()
+	if addr == "" {
+		addr = fmt.Sprintf("localhost:%d", t.port)
+	}
+	if addr == t.shownAddr {
+		return
+	}
+	t.shownAddr = addr
+	t.status.SetTitle("Running on " + addr)
+	systray.SetTooltip("ESI Proxy — running on " + addr)
+}
+
+// isLANBind reports whether host exposes the proxy beyond this machine.
+// Loopback names bind same-machine only; anything else (0.0.0.0, a LAN IP)
+// is reachable from the network.
+func isLANBind(host string) bool {
+	switch host {
+	case "", "localhost", "127.0.0.1", "::1", "[::1]":
+		return false
+	default:
+		return true
+	}
+}
+
 func (t *Tray) onAddCharacter() {
 	account, err := t.st.GetOrCreateDefaultAccount()
 	if err != nil {
@@ -195,6 +279,7 @@ func (t *Tray) onAddCharacter() {
 }
 
 func (t *Tray) refresh() {
+	t.updateAddressDisplay()
 	t.refreshCharacters()
 	t.refreshPending()
 	t.refreshGrants()

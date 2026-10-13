@@ -77,6 +77,34 @@ func (s *Server) ClientID() string {
 	return s.sso.Get().ClientID()
 }
 
+// BindHost returns the host the HTTP server is configured to bind to, read
+// from config.json.
+func (s *Server) BindHost() (string, error) {
+	s.cfgMu.Lock()
+	defer s.cfgMu.Unlock()
+
+	cfg, err := config.Load(s.dataDir)
+	if err != nil {
+		return "", err
+	}
+	return cfg.BindHost, nil
+}
+
+// SetBindHost persists a new bind host to config.json. It only saves the
+// setting: the listener itself is rebound live by the caller (see the
+// network type in cmd/esi-proxy), which calls this once the rebind succeeds.
+func (s *Server) SetBindHost(host string) error {
+	s.cfgMu.Lock()
+	defer s.cfgMu.Unlock()
+
+	cfg, err := config.Load(s.dataDir)
+	if err != nil {
+		return err
+	}
+	cfg.BindHost = host
+	return config.Save(s.dataDir, cfg)
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)

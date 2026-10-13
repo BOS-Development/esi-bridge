@@ -10,7 +10,7 @@
 
 ## List Characters
 
-`curl -s http://localhost:8085/api/characters -H "X-Proxy-Api-Key: 064b58ede99457379b787bc90c060bb7670ac6d17d38d9f4d09f08756e7aea60"`
+`curl -s http://localhost:8085/api/characters -H "X-Proxy-Api-Key: 944de15c801df8f350ee6e7e143dc05f6629d0f073208bd8c27fb8498c556e18"`
 
 ## Request ESI Access
 
@@ -18,4 +18,4 @@
 
 ## Get Character Location
 
-`curl -s http://localhost:8085/proxy/1978535095/characters/1978535095/location/ -H "X-Proxy-Api-Key: 944de15c801df8f350ee6e7e143dc05f6629d0f073208bd8c27fb8498c556e18"`
+`curl -s http://localhost:8085/characters/1978535095/location/ -H "X-Proxy-Api-Key: 064b58ede99457379b787bc90c060bb7670ac6d17d38d9f4d09f08756e7aea60"`
