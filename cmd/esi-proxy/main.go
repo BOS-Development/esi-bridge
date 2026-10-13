@@ -60,6 +60,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "mdns":
+			if err := runMDNS(os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "mdns:", err)
+				os.Exit(1)
+			}
+			return
 		case "-h", "--help", "help":
 			printUsage()
 			return
@@ -79,6 +85,8 @@ Usage:
   esi-proxy                                  run the proxy (tray + HTTP server)
   esi-proxy export --out=bundle.enc          export accounts/characters/tokens
   esi-proxy import --in=bundle.enc           import a bundle onto this machine
+  esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
+  esi-proxy mdns browse   [--duration D]     debug: discover esi-proxy services on the LAN
   esi-proxy eveauth-proxy://callback?...     internal: invoked by the OS to deliver
                                               an SSO callback to the running instance`)
 }
