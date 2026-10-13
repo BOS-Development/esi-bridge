@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net"
 	"strings"
 	"time"
 
@@ -19,18 +18,31 @@ import (
 
 const refreshInterval = 3 * time.Second
 
+// Network is the live HTTP listener and mDNS advert, which the LAN access
+// toggle rebinds without a restart.
+type Network interface {
+	// BindHost is the host the listener is bound to right now.
+	BindHost() string
+	// SetBindHost rebinds the listener and re-advertises; on error the
+	// previous bind is still in effect.
+	SetBindHost(host string) error
+	// Address is the host:port other applications should connect to. It
+	// can change on its own, e.g. when the machine's LAN IP does.
+	Address() string
+}
+
 type Tray struct {
-	st   *store.Store
-	srv  *server.Server
-	log  *slog.Logger
-	port int
+	st      *store.Store
+	srv     *server.Server
+	network Network
+	log     *slog.Logger
+	port    int
 
 	// status is the disabled menu item (and tooltip) showing where the proxy
-	// is reachable. effectiveHost is the host actually bound this run; the
-	// bind only changes on restart, so a displayed host that differs from it
-	// is shown as "(after restart)" rather than claimed as already live.
-	status        *systray.MenuItem
-	effectiveHost string
+	// is reachable; shownAddr is what it currently says, so the periodic
+	// refresh only touches it when the address actually changes.
+	status    *systray.MenuItem
+	shownAddr string
 
 	// onCocoaReady, if set, is called once at the start of onReady — after
 	// the native event loop (and on macOS, NSApplication's own startup) has
@@ -79,10 +91,11 @@ type permGrantChild struct {
 	applicationID int64
 }
 
-func New(st *store.Store, srv *server.Server, log *slog.Logger, port int, onCocoaReady func()) *Tray {
+func New(st *store.Store, srv *server.Server, network Network, log *slog.Logger, port int, onCocoaReady func()) *Tray {
 	return &Tray{
 		st:                st,
 		srv:               srv,
+		network:           network,
 		log:               log,
 		port:              port,
 		onCocoaReady:      onCocoaReady,
@@ -106,19 +119,12 @@ func (t *Tray) onReady(ctx context.Context) {
 		t.onCocoaReady()
 	}
 
-	bindHost, err := t.srv.BindHost()
-	if err != nil {
-		t.log.Error("read bind host", "error", err)
-		bindHost = "localhost"
-	}
-	t.effectiveHost = t.displayHost(bindHost)
-
 	systray.SetIcon(icon())
 	systray.SetTitle("ESI Proxy")
 
 	t.status = systray.AddMenuItem("", "")
 	t.status.Disable()
-	t.setAddressDisplay(t.effectiveHost)
+	t.updateAddressDisplay()
 	systray.AddSeparator()
 
 	setClientID := systray.AddMenuItem("Set EVE Client ID", "Configure the EVE SSO application this proxy uses")
@@ -129,7 +135,7 @@ func (t *Tray) onReady(ctx context.Context) {
 	}()
 
 	lanAccess := systray.AddMenuItemCheckbox("Allow LAN Access",
-		"Let other machines on your network connect to this proxy (takes effect on restart)", isLANBind(bindHost))
+		"Let other machines on your network connect to this proxy", isLANBind(t.network.BindHost()))
 	go func() {
 		for range lanAccess.ClickedCh {
 			t.onToggleLANAccess(lanAccess)
@@ -201,9 +207,9 @@ func (t *Tray) onSetClientID() {
 	}
 }
 
-// onToggleLANAccess flips the configured bind host between localhost-only and
-// all-interfaces and persists it. The running listener is already bound, so
-// the change is advisory until the next restart — the notification says so.
+// onToggleLANAccess flips the bind host between localhost-only and
+// all-interfaces. The listener is rebound and the mDNS advert updated
+// immediately, and the choice is saved for future runs.
 func (t *Tray) onToggleLANAccess(item *systray.MenuItem) {
 	enable := !item.Checked()
 
@@ -211,51 +217,37 @@ func (t *Tray) onToggleLANAccess(item *systray.MenuItem) {
 	if enable {
 		host = "0.0.0.0"
 	}
-	if err := t.srv.SetBindHost(host); err != nil {
+	if err := t.network.SetBindHost(host); err != nil {
 		t.log.Error("set bind host", "error", err)
+		notify.Send(t.log, "esi-proxy: couldn't change LAN access", err.Error())
 		return
 	}
 
+	t.updateAddressDisplay()
 	if enable {
 		item.Check()
-		t.setAddressDisplay(localIP())
 		notify.Send(t.log, "esi-proxy: LAN access enabled",
-			"Other machines can connect once you restart esi-proxy.")
+			"Other machines on your network can now connect at "+t.shownAddr+".")
 	} else {
 		item.Uncheck()
-		t.setAddressDisplay("localhost")
 		notify.Send(t.log, "esi-proxy: LAN access disabled",
-			"Proxy will bind to localhost only once you restart esi-proxy.")
+			"The proxy is now reachable from this machine only.")
 	}
 }
 
-// setAddressDisplay updates the status menu item and tooltip to show where
-// the proxy is reachable. A host that differs from the one bound this run is
-// marked "(after restart)", since the listener's bind only changes on
-// restart and the menu must not claim an address that isn't live yet.
-func (t *Tray) setAddressDisplay(host string) {
-	addr := fmt.Sprintf("%s:%d", host, t.port)
-	suffix := ""
-	if host != t.effectiveHost {
-		suffix = " (after restart)"
+// updateAddressDisplay updates the status menu item and tooltip to show
+// where the proxy is reachable, if that has changed since last shown.
+func (t *Tray) updateAddressDisplay() {
+	addr := t.network.Address()
+	if addr == "" {
+		addr = fmt.Sprintf("localhost:%d", t.port)
 	}
-	t.status.SetTitle("Running on " + addr + suffix)
-	systray.SetTooltip("ESI Proxy — running on " + addr + suffix)
-}
-
-// displayHost maps a configured bind host to the address worth showing the
-// user. A wildcard bind is shown as this machine's actual LAN IP (what
-// another machine would connect to); a loopback bind as localhost; and a
-// specific interface IP verbatim. This mirrors advertiseURL in cmd/esi-proxy.
-func (t *Tray) displayHost(bindHost string) string {
-	switch bindHost {
-	case "", "0.0.0.0", "::", "[::]":
-		return localIP()
-	case "localhost", "127.0.0.1", "::1", "[::1]":
-		return "localhost"
-	default:
-		return bindHost
+	if addr == t.shownAddr {
+		return
 	}
+	t.shownAddr = addr
+	t.status.SetTitle("Running on " + addr)
+	systray.SetTooltip("ESI Proxy — running on " + addr)
 }
 
 // isLANBind reports whether host exposes the proxy beyond this machine.
@@ -268,22 +260,6 @@ func isLANBind(host string) bool {
 	default:
 		return true
 	}
-}
-
-// localIP returns this machine's primary outbound IPv4 address by inspecting
-// the route to a public address. No packets are sent — a UDP "connection"
-// only resolves the local interface — so this works offline-ish and without
-// opening the network. Falls back to "localhost" if no route is found.
-func localIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return "localhost"
-	}
-	defer conn.Close()
-	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
-		return addr.IP.String()
-	}
-	return "localhost"
 }
 
 func (t *Tray) onAddCharacter() {
@@ -303,6 +279,7 @@ func (t *Tray) onAddCharacter() {
 }
 
 func (t *Tray) refresh() {
+	t.updateAddressDisplay()
 	t.refreshCharacters()
 	t.refreshPending()
 	t.refreshGrants()
