@@ -65,6 +65,14 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "serve-ui", "--serve-ui":
+			// Dev-only: start just the HTTP server so the management UI at
+			// /app can be previewed in a browser, without the tray.
+			if err := runServeUI(log); err != nil {
+				log.Error("serve-ui", "error", err)
+				os.Exit(1)
+			}
+			return
 		case "-h", "--help", "help":
 			printUsage()
 			return
@@ -86,6 +94,7 @@ Usage:
   esi-proxy import --in=bundle.enc           import a bundle onto this machine
   esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
   esi-proxy mdns browse   [--duration D]     debug: discover esi-proxy services on the LAN
+  esi-proxy serve-ui                         dev: serve the management UI only (no tray), at /app
   esi-proxy eveauth-proxy://callback?...     internal: invoked by the OS to deliver
                                               an SSO callback to the running instance`)
 }
@@ -200,6 +209,66 @@ func run(log *slog.Logger) error {
 	netw.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// runServeUI starts only the HTTP server — no tray, no mDNS advertising, no
+// token-refresh worker — bound to localhost, so the management UI at /app can
+// be previewed in a browser during development. It uses the real config and
+// database, so characters/grants/settings behave exactly as in the full app
+// (only SSO login won't complete, since that needs the .app bundle's custom
+// URL scheme). Blocks until interrupted.
+func runServeUI(log *slog.Logger) error {
+	dataDir, err := config.Dir()
+	if err != nil {
+		return fmt.Errorf("resolve config dir: %w", err)
+	}
+	cfg, err := config.Load(dataDir)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	conn, err := db.Open(cfg.DataDir)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer conn.Close()
+
+	masterKey, err := cryptox.MasterKey(cfg.DataDir)
+	if err != nil {
+		return fmt.Errorf("load master key: %w", err)
+	}
+
+	st := store.New(conn)
+	redirectURL := urlscheme.Scheme + "://callback"
+	sso := esi.NewSSOHolder(esi.NewSSO(cfg.EVEClientID, cfg.EVESSOBaseURL, redirectURL, server.LoginScopes))
+	esiClient := esi.NewClient(cfg.ESIBaseURL)
+	respCache := cache.New()
+	tokenMgr := tokens.NewManager(st, sso, masterKey)
+	srv := server.New(st, sso, esiClient, respCache, tokenMgr, log, cfg.DataDir, cfg.EVESSOBaseURL, redirectURL)
+
+	// Always localhost for the preview — the UI surface is loopback-only
+	// regardless, and this keeps the dev server off the network.
+	addr := fmt.Sprintf("localhost:%d", cfg.Port)
+	httpServer := &http.Server{Addr: addr, Handler: srv.Handler()}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("http server", "error", err)
+			stop()
+		}
+	}()
+
+	fmt.Printf("ESI Proxy management UI (dev, no tray): http://%s/app\n", addr)
+	fmt.Println("Press Ctrl-C to stop.")
+
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return httpServer.Shutdown(shutdownCtx)
 }
 
 func sweepCache(ctx context.Context, c *cache.Cache) {
