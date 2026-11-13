@@ -16,7 +16,20 @@ BUNDLE_ID="dev.bos-development.esi-proxy"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 
-go build -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
+# Both this binary's internal/urlscheme package and fyne.io/systray compile
+# Objective-C and link Cocoa, so Go's linker appends -lobjc once per package.
+# The newer Apple linker (Xcode 15+) warns "ignoring duplicate libraries:
+# '-lobjc'" about the resulting dup — harmless, but noisy. Silence it with the
+# new linker's own flag, but only when the linker actually supports it (older
+# linkers both lack the flag and never emit the warning). Go's cgo flag
+# allowlist rejects this flag in a #cgo directive, so it's passed here via
+# -extldflags instead. Empty string = flag unsupported; safe under `set -u`.
+LDFLAGS_ARG=""
+if ! ld -no_warn_duplicate_libraries 2>&1 | grep -q "unknown option"; then
+	LDFLAGS_ARG="-ldflags=-extldflags=-Wl,-no_warn_duplicate_libraries"
+fi
+
+go build ${LDFLAGS_ARG} -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
 
 cat > "$APP_DIR/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
