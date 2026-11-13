@@ -96,18 +96,20 @@ func (s *Store) ListAccounts() ([]Account, error) {
 // UpsertCharacter stores or replaces a character's tokens, e.g. after SSO
 // login or an import.
 func (s *Store) UpsertCharacter(c Character) error {
+	ts := now()
 	_, err := s.db.Exec(`
-		INSERT INTO characters (id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO characters (id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at, tokens_updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			account_id = excluded.account_id,
 			name = excluded.name,
 			refresh_token_enc = excluded.refresh_token_enc,
 			access_token_enc = excluded.access_token_enc,
 			access_token_expires_at = excluded.access_token_expires_at,
-			scopes = excluded.scopes
+			scopes = excluded.scopes,
+			tokens_updated_at = excluded.tokens_updated_at
 	`, c.ID, c.AccountID, c.Name, c.RefreshTokenEnc, c.AccessTokenEnc,
-		FormatTime(c.AccessTokenExpiresAt), joinScopes(c.Scopes), now())
+		FormatTime(c.AccessTokenExpiresAt), joinScopes(c.Scopes), ts, ts)
 	if err != nil {
 		return fmt.Errorf("upsert character: %w", err)
 	}
@@ -117,8 +119,8 @@ func (s *Store) UpsertCharacter(c Character) error {
 // UpdateCharacterTokens is called after a token refresh, which may rotate
 // the refresh token as well as issuing a new access token.
 func (s *Store) UpdateCharacterTokens(id int64, refreshTokenEnc, accessTokenEnc []byte, expiresAt string) error {
-	res, err := s.db.Exec(`UPDATE characters SET refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ? WHERE id = ?`,
-		refreshTokenEnc, accessTokenEnc, expiresAt, id)
+	res, err := s.db.Exec(`UPDATE characters SET refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?, tokens_updated_at = ? WHERE id = ?`,
+		refreshTokenEnc, accessTokenEnc, expiresAt, now(), id)
 	if err != nil {
 		return err
 	}
@@ -131,17 +133,25 @@ func (s *Store) UpdateCharacterTokens(id int64, refreshTokenEnc, accessTokenEnc 
 func scanCharacter(row interface{ Scan(...any) error }) (Character, error) {
 	var c Character
 	var expiresAt, createdAt, scopes string
-	err := row.Scan(&c.ID, &c.AccountID, &c.Name, &c.RefreshTokenEnc, &c.AccessTokenEnc, &expiresAt, &scopes, &createdAt)
+	var tokensUpdatedAt sql.NullString
+	err := row.Scan(&c.ID, &c.AccountID, &c.Name, &c.RefreshTokenEnc, &c.AccessTokenEnc, &expiresAt, &scopes, &createdAt, &tokensUpdatedAt)
 	if err != nil {
 		return Character{}, err
 	}
 	c.AccessTokenExpiresAt = parseTime(expiresAt)
 	c.CreatedAt = parseTime(createdAt)
+	// Pre-migration rows may have a NULL tokens_updated_at; fall back to the
+	// creation time so the "tokens last refreshed" display still has a value.
+	if tokensUpdatedAt.Valid && tokensUpdatedAt.String != "" {
+		c.TokensUpdatedAt = parseTime(tokensUpdatedAt.String)
+	} else {
+		c.TokensUpdatedAt = c.CreatedAt
+	}
 	c.Scopes = splitScopes(scopes)
 	return c, nil
 }
 
-const characterColumns = `id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at`
+const characterColumns = `id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at, tokens_updated_at`
 
 func (s *Store) GetCharacter(id int64) (Character, error) {
 	row := s.db.QueryRow(`SELECT `+characterColumns+` FROM characters WHERE id = ?`, id)
@@ -150,6 +160,20 @@ func (s *Store) GetCharacter(id int64) (Character, error) {
 		return Character{}, ErrNotFound
 	}
 	return c, err
+}
+
+// DeleteCharacter removes a character and, via ON DELETE CASCADE, its grants
+// and pending grants. Foreign keys are enabled on the connection, so the
+// cascade actually fires.
+func (s *Store) DeleteCharacter(id int64) error {
+	res, err := s.db.Exec(`DELETE FROM characters WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) ListCharacters() ([]Character, error) {
@@ -427,6 +451,21 @@ func (s *Store) ListActiveGrantsForApplication(applicationID int64) ([]GrantView
 
 func (s *Store) RevokeGrant(id int64) error {
 	res, err := s.db.Exec(`UPDATE grants SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL`, now(), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateGrantScopes replaces the scope set on an active grant, for editing an
+// application's per-character permissions from the UI. Revoking is a separate
+// operation (RevokeGrant); this only ever narrows or adjusts a live grant.
+func (s *Store) UpdateGrantScopes(id int64, scopes []string) error {
+	res, err := s.db.Exec(`UPDATE grants SET scopes = ? WHERE id = ? AND revoked_at IS NULL`,
+		joinScopes(scopes), id)
 	if err != nil {
 		return err
 	}

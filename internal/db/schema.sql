@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS characters (
     access_token_enc        BLOB NOT NULL,
     access_token_expires_at TEXT NOT NULL,
     scopes                  TEXT NOT NULL DEFAULT '',
-    created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    -- When the token pair was last written (login or refresh). Drives the
+    -- "tokens last refreshed" age shown on the character detail page.
+    tokens_updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS applications (

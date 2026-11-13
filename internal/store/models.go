@@ -20,6 +20,9 @@ type Character struct {
 	AccessTokenExpiresAt time.Time
 	Scopes               []string
 	CreatedAt            time.Time
+	// TokensUpdatedAt is when the token pair was last written (login or
+	// refresh), used to show the age of the character's tokens.
+	TokensUpdatedAt time.Time
 }
 
 type Application struct {

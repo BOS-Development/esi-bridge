@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="session-token" content="__SESSION_TOKEN__">
+<title>ESI Proxy</title>
+<link rel="stylesheet" href="/app/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">ESI Proxy</div>
+  <div class="topbar-actions">
+    <span id="status" class="status">connecting…</span>
+    <button id="add-character" class="btn primary">Add Character</button>
+  </div>
+</header>
+
+<div class="app">
+  <nav class="sidebar" aria-label="Sections">
+    <a class="nav-item" href="#/characters" data-nav="characters">Characters</a>
+    <a class="nav-item" href="#/requests" data-nav="requests">
+      Requests <span class="nav-count" data-nav-count="requests"></span>
+    </a>
+    <a class="nav-item" href="#/grants" data-nav="grants">Grants</a>
+    <a class="nav-item" href="#/permissions" data-nav="permissions">Permissions</a>
+    <a class="nav-item" href="#/settings" data-nav="settings">Settings</a>
+  </nav>
+
+  <main id="view" class="view" aria-live="polite"></main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/app/static/app.js"></script>
+</body>
+</html>
