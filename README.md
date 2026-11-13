@@ -85,6 +85,10 @@ The proxy listens on `localhost:8085` by default. An app can either use that add
 4. Approve or deny that request from the tray's **Pending Approvals** menu.
 5. The app then calls ESI through the proxy: `GET http://localhost:8085/proxy/12345/<esi-path>` with the same `X-Proxy-Api-Key` header. It can check its current character-level access at any time via `GET /api/grants` (id, name, and the specific scopes granted).
 
+#### Example application
+
+[`examples/location-watcher`](examples/location-watcher/) is a small, runnable example client that walks this whole flow end to end — it detects the proxy, requests `list_characters`, lets you pick a character, requests that character's location/ship scopes, then displays the character's current ship and location, refreshing each on its ESI cache timeout (read from the relayed `Expires` header). It uses only the standard library and the public HTTP API, so it also serves as a copy-paste reference. Build it with `./scripts/build-example-<os>.sh` (or `go run ./examples/location-watcher`); see its [README](examples/location-watcher/README.md).
+
 ### Discovery & network access
 
 So that external apps don't have to hard-code `localhost:8085`, the proxy advertises itself on the local network over **mDNS / DNS-SD** (the same "Bonjour"/Zeroconf mechanism printers use) while it's running.
