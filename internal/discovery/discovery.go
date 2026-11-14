@@ -4,10 +4,12 @@
 // is what makes the service visible to the OS's own tooling (e.g. dns-sd) and
 // to other devices on the network; an in-process, second responder is not.
 // Per-OS registration lives in advertise_<goos>.go; Advertise has the same
-// signature on every platform.
+// signature on every platform: ip, if non-nil, is the address the service
+// should resolve to on responders that need one supplied (Windows).
 package discovery
 
 import (
+	"net"
 	"os"
 	"strings"
 )
@@ -40,4 +42,20 @@ func shortHost(h string) string {
 // bind), and path is the base request path.
 func txtRecords(baseURL string) []string {
 	return []string{"base_url=" + baseURL, "path=/"}
+}
+
+// LANIP returns this machine's primary outbound IPv4 address by inspecting
+// the route to a public address. No packets are sent — a UDP "connection"
+// only resolves the local interface. Returns nil if there's no route (e.g.
+// the machine is offline).
+func LANIP() net.IP {
+	conn, err := net.Dial("udp4", "8.8.8.8:80")
+	if err != nil {
+		return nil
+	}
+	defer conn.Close()
+	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok && !addr.IP.IsLoopback() {
+		return addr.IP.To4()
+	}
+	return nil
 }
