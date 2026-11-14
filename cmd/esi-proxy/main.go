@@ -182,8 +182,10 @@ func run(log *slog.Logger) error {
 
 	// netw owns the HTTP listener and the mDNS advert, which lets external
 	// apps (Pyfa, MCO, …) discover the proxy without a hand-configured
-	// host:port. It rebinds both live when LAN access is toggled in the tray.
+	// host:port. It rebinds both live when LAN access is toggled in the
+	// window (via /manage/bind-host, which calls back into netw).
 	netw := newNetwork(log, cfg.Port, srv.Handler(), srv.SetBindHost)
+	srv.SetRebinder(netw.SetBindHost)
 	if err := netw.Start(ctx, cfg.BindHost); err != nil {
 		log.Error("http server", "error", err)
 	}
@@ -223,7 +225,7 @@ func run(log *slog.Logger) error {
 	// init()), and on macOS Cocoa's run loop only works on that thread.
 	// Quitting the tray (Quit clicked, or ctx canceled) is what unblocks
 	// this call; shutdown continues below once it returns.
-	tray.New(st, srv, log, cfg.Port, onCocoaReady, winLauncher.Open).Run(ctx)
+	tray.New(st, srv, netw, log, cfg.Port, onCocoaReady, winLauncher.Open).Run(ctx)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

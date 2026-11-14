@@ -40,6 +40,12 @@ type Server struct {
 
 	cfgMu sync.Mutex // guards persisting config.json from SetClientID
 
+	// rebind, if set, applies a new bind host to the live listener (and mDNS
+	// advert) and persists it via SetBindHost once the rebind succeeds. It's
+	// wired in by the process that owns the listener (see SetRebinder);
+	// without it, /manage/bind-host only saves the setting for next start.
+	rebind func(host string) error
+
 	loginMu  sync.Mutex
 	loginTxn map[string]pendingLogin // state -> pending login
 }
@@ -111,6 +117,13 @@ func (s *Server) BindHost() (string, error) {
 		return "", err
 	}
 	return cfg.BindHost, nil
+}
+
+// SetRebinder installs the function /manage/bind-host uses to apply a bind
+// host change live. It must be called before the server starts handling
+// requests.
+func (s *Server) SetRebinder(rebind func(host string) error) {
+	s.rebind = rebind
 }
 
 // SetBindHost persists a new bind host to config.json. It only saves the

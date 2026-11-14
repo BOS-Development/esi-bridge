@@ -326,14 +326,15 @@ function viewSettings() {
   lanLabel.append(lan, " Allow LAN access");
   lanBox.appendChild(lanLabel);
   lanBox.appendChild(el("p", "hint",
-    "Let other machines on your network connect to this proxy. Takes effect on the next restart. Only enable on networks you trust."));
+    "Let other machines on your network connect to this proxy. Takes effect immediately. Only enable on networks you trust."));
   inner.appendChild(lanBox);
 
   lan.addEventListener("change", async () => {
     const enabled = lan.checked;
     try {
-      await api("POST", "/manage/bind-host", { lan: enabled });
-      toast(enabled ? "LAN access on — restart to apply" : "LAN access off — restart to apply");
+      const res = await api("POST", "/manage/bind-host", { lan: enabled });
+      const suffix = res && res.live ? "" : " — restart to apply";
+      toast((enabled ? "LAN access on" : "LAN access off") + suffix);
     } catch (err) {
       lan.checked = !enabled;
       toast(err.message, true);

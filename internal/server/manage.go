@@ -417,9 +417,15 @@ func (s *Server) handleManageSetClientID(w http.ResponseWriter, r *http.Request)
 
 type setBindHostRequest struct {
 	// LAN toggles between localhost-only (false) and all-interfaces (true).
-	// Like the old tray toggle, this takes effect on the next restart since
-	// the listener is bound once at startup.
+	// When a rebinder is installed (the normal app), the listener moves
+	// immediately; otherwise the change is only saved for the next start.
 	LAN bool `json:"lan"`
+}
+
+type setBindHostResponse struct {
+	// Live reports whether the change took effect immediately (true) or
+	// only on the next start (false).
+	Live bool `json:"live"`
 }
 
 func (s *Server) handleManageSetBindHost(w http.ResponseWriter, r *http.Request) {
@@ -432,15 +438,27 @@ func (s *Server) handleManageSetBindHost(w http.ResponseWriter, r *http.Request)
 	if req.LAN {
 		host = "0.0.0.0"
 	}
+	if s.rebind != nil {
+		if err := s.rebind(host); err != nil {
+			// The previous listener is still in place; report why the new
+			// one couldn't be bound (e.g. port in use) so the UI can show it.
+			s.log.Error("rebind listener", "bind_host", host, "error", err)
+			http.Error(w, "couldn't change LAN access: "+err.Error(), http.StatusConflict)
+			return
+		}
+		s.log.Info("bind host updated", "bind_host", host)
+		writeJSON(w, http.StatusOK, setBindHostResponse{Live: true})
+		return
+	}
 	if err := s.SetBindHost(host); err != nil {
 		s.manageError(w, "set bind host", err)
 		return
 	}
 	s.log.Info("bind host updated (effective on restart)", "bind_host", host)
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, setBindHostResponse{Live: false})
 }
 
-// isLANBindHost mirrors the tray's isLANBind: loopback names are same-machine
+// isLANBindHost reports whether host exposes the proxy beyond this machine: loopback names are same-machine
 // only; anything else exposes the proxy to the network.
 func isLANBindHost(host string) bool {
 	switch host {

@@ -453,8 +453,8 @@ func TestManageSetBindHostTogglesLANFlag(t *testing.T) {
 
 	resp := manageReq(t, ts, http.MethodPost, "/manage/bind-host", token, map[string]any{"lan": true})
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("set bind-host lan=true: status = %d, want 204", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("set bind-host lan=true: status = %d, want 200", resp.StatusCode)
 	}
 	state := manageState(t, ts, token)
 	if lan, _ := state["lan_access"].(bool); !lan {
@@ -466,8 +466,8 @@ func TestManageSetBindHostTogglesLANFlag(t *testing.T) {
 
 	resp = manageReq(t, ts, http.MethodPost, "/manage/bind-host", token, map[string]any{"lan": false})
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("set bind-host lan=false: status = %d, want 204", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("set bind-host lan=false: status = %d, want 200", resp.StatusCode)
 	}
 	state = manageState(t, ts, token)
 	if lan, _ := state["lan_access"].(bool); lan {
