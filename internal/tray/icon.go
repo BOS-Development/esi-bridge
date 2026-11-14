@@ -5,26 +5,12 @@ import (
 	"encoding/binary"
 	"image"
 	"image/color"
-	"image/png"
 )
 
-// icon renders a small solid-color square with a simplified "E" mark as the
-// tray icon. Generated in code rather than shipped as a binary asset so the
-// module has no external image dependency.
-//
-// Returned as a .ico container wrapping the PNG, not a bare PNG: systray's
-// Windows backend loads icon bytes via Win32 LoadImage(IMAGE_ICON, ...),
-// which requires a real ICONDIR header and fails to parse raw PNG bytes.
-// That failure surfaces as a misleading "systray error: unable to set icon:
-// The operation completed successfully" (a stale GetLastError(), not an
-// actual success) and the tray icon never appears. The Vista+ ICO format
-// embedding a PNG image works on Windows and is accepted as-is on macOS and
-// Linux, so one encoding covers every platform.
-func icon() []byte {
-	return pngToICO(iconPNG())
-}
-
-func iconPNG() []byte {
+// iconImage renders a small solid-color square with a simplified "E" mark as
+// the tray icon. Generated in code rather than shipped as a binary asset so
+// the module has no external image dependency.
+func iconImage() *image.RGBA {
 	const size = 32
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 
@@ -50,9 +36,7 @@ func iconPNG() []byte {
 		img.Set(x, 16, fg)
 	}
 
-	var buf bytes.Buffer
-	_ = png.Encode(&buf, img)
-	return buf.Bytes()
+	return img
 }
 
 // pngToICO wraps a single 32x32 PNG image in a minimal single-entry .ico
