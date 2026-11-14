@@ -48,6 +48,16 @@ func main() {
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "--window":
+			// Child invocation that hosts the management UI in a native
+			// window. Dispatched here, before run() starts any goroutine, so
+			// it keeps the process's initial OS thread for the native UI run
+			// loop (see internal/window).
+			if err := runWindow(os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "window failed:", err)
+				os.Exit(1)
+			}
+			return
 		case "export":
 			if err := runExport(os.Args[2:]); err != nil {
 				fmt.Fprintln(os.Stderr, "export failed:", err)
@@ -96,6 +106,8 @@ Usage:
   esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
   esi-proxy mdns browse   [--duration D]     debug: discover esi-proxy services on the LAN
   esi-proxy serve-ui                         dev: serve the management UI only (no tray), at /app
+  esi-proxy --window --url URL               internal: host the management UI in a native
+                                              window (spawned by the running instance)
   esi-proxy eveauth-proxy://callback?...     internal: invoked by the OS to deliver
                                               an SSO callback to the running instance`)
 }
@@ -194,6 +206,15 @@ func run(log *slog.Logger) error {
 
 	go sweepCache(ctx, respCache)
 
+	// The management UI lives in a native window hosted by a child process
+	// (see window.go / internal/window). Open it on launch so the app
+	// presents a window like any desktop app, and hand the tray the same
+	// launcher so "Open ESI Proxy" can re-open it after it's been closed. The
+	// loopback /app page stays reachable from a browser regardless.
+	winLauncher := newWindowLauncher(cfg.Port, log)
+	go winLauncher.Open()
+	defer winLauncher.Close()
+
 	// onCocoaReady fires from inside the tray's onReady — after the native
 	// event loop (and on macOS, NSApplication's own startup) has finished.
 	// On macOS this is what receives an eveauth-proxy:// callback URL when
@@ -216,7 +237,7 @@ func run(log *slog.Logger) error {
 	// init()), and on macOS Cocoa's run loop only works on that thread.
 	// Quitting the tray (Quit clicked, or ctx canceled) is what unblocks
 	// this call; shutdown continues below once it returns.
-	tray.New(st, srv, log, cfg.Port, onCocoaReady).Run(ctx)
+	tray.New(st, srv, log, cfg.Port, onCocoaReady, winLauncher.Open).Run(ctx)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

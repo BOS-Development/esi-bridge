@@ -30,7 +30,7 @@ Proxies all Eve Online ESI connections, allowing applications to access characte
 
 ## Getting Started
 
-esi-proxy is a single Go binary with a system tray UI — no separate services to run.
+esi-proxy is a single Go binary with a desktop app window (backed by a small background tray/menu-bar presence) — no separate services to run.
 
 ### 1. Register an EVE SSO application
 
@@ -43,6 +43,13 @@ Go to [developers.eveonline.com](https://developers.eveonline.com) and create an
 Copy the generated **Client ID**.
 
 ### 2. Build and run
+
+Building needs a C toolchain (`CGO_ENABLED=1`): the app window embeds the
+platform's native webview, and the tray/menu-bar presence is native too.
+
+* **macOS** — Xcode command-line tools (`xcode-select --install`). WebKit ships with the OS.
+* **Linux** — GTK 3 and WebKitGTK dev packages, e.g. `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` (Debian/Ubuntu).
+* **Windows** — the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Windows 10/11); build with a C compiler such as the one from MSYS2/MinGW or TDM-GCC.
 
 **Windows:**
 
@@ -69,7 +76,9 @@ open "ESI Proxy.app"
 
 The Windows and Linux scripts are thin wrappers around `go build -o esi-proxy[.exe] ./cmd/esi-proxy` — feel free to invoke that directly instead.
 
-A tray icon appears. Click **Set EVE Client ID** — it opens a small local page in your browser to paste in the Client ID from step 1; it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt before handing off to the app — that's expected custom-scheme behavior, not a bug, and afterwards you'll get a desktop notification confirming the character was added (the browser tab itself can't show much once the handoff happens).
+The **ESI Proxy** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Proxy** in that menu re-opens it). In **Settings**, paste the Client ID from step 1 — it's saved and takes effect immediately, no restart needed — then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
+
+The management UI is served over a loopback-only HTTP endpoint, so it also remains reachable in a browser at `http://localhost:8085/app` if you prefer that.
 
 (Config lives in a file the app manages for you — macOS: `~/Library/Application Support/esi-proxy/config.json`, Linux: `~/.config/esi-proxy/config.json`, Windows: `%AppData%\esi-proxy\config.json` — you shouldn't need to touch it directly.)
 
@@ -78,11 +87,11 @@ A tray icon appears. Click **Set EVE Client ID** — it opens a small local page
 The proxy listens on `localhost:8085` by default. An app can either use that address directly, or discover it over mDNS (see [Discovery & network access](#discovery--network-access) below) so the user never has to type a host:port.
 
 1. The app registers itself: `POST http://localhost:8085/api/register {"name": "Pyfa"}` → returns an `api_key`.
-2. To discover characters/accounts rather than being told a character_id out of band, the app requests app-wide permissions: `POST http://localhost:8085/api/request-permissions` with header `X-Proxy-Api-Key: <api_key>` and body `{"permissions": ["list_characters", "list_accounts"]}`. Approve or deny each from the tray's **Permission Requests** menu.
+2. To discover characters/accounts rather than being told a character_id out of band, the app requests app-wide permissions: `POST http://localhost:8085/api/request-permissions` with header `X-Proxy-Api-Key: <api_key>` and body `{"permissions": ["list_characters", "list_accounts"]}`. Approve or deny each from the window's **Requests** view.
    * `list_characters` unlocks `GET /api/characters` returning every character on the proxy (id + name) instead of just ones it already has a per-character grant for.
    * `list_accounts` unlocks `GET /api/accounts` (id + name), and adds `account_id` to each entry from `/api/characters`. Neither is granted by default — account grouping is private, user-managed data ESI itself never exposes.
 3. The app requests access to a specific character: `POST http://localhost:8085/api/request-access` with the same header and body `{"character_id": 12345, "scopes": [...]}`.
-4. Approve or deny that request from the tray's **Pending Approvals** menu.
+4. Approve or deny that request from the window's **Requests** view. (When the window is closed, a desktop notification lets you know a request is waiting.)
 5. The app then calls ESI through the proxy: `GET http://localhost:8085/proxy/12345/<esi-path>` with the same `X-Proxy-Api-Key` header. It can check its current character-level access at any time via `GET /api/grants` (id, name, and the specific scopes granted).
 
 ### Discovery & network access
@@ -98,11 +107,11 @@ An app discovers the proxy by browsing for `_esi-proxy._tcp` and reading `base_u
 
 #### Letting other machines connect (LAN access)
 
-By default the proxy binds to `localhost`, so only applications **on the same machine** can connect — the token-holding proxy stays off the network. To let other machines on your LAN connect to a proxy they discover, enable **Allow LAN Access** in the tray menu. This binds to all interfaces and advertises your machine's `hostname.local` address instead of `localhost`.
+By default the proxy binds to `localhost`, so only applications **on the same machine** can connect — the token-holding proxy stays off the network. To let other machines on your LAN connect to a proxy they discover, enable **Allow LAN access** in the window's **Settings** view. This binds to all interfaces and advertises your machine's `hostname.local` address instead of `localhost`.
 
-The listener is bound once at startup, so **toggling LAN access takes effect on the next restart** (the tray notification reminds you). You can also set it directly in `config.json` via `"bind_host"`: `"localhost"` (default, same-machine only), `"0.0.0.0"` (all interfaces), or a specific interface IP.
+The listener is bound once at startup, so **toggling LAN access takes effect on the next restart**. You can also set it directly in `config.json` via `"bind_host"`: `"localhost"` (default, same-machine only), `"0.0.0.0"` (all interfaces), or a specific interface IP.
 
-> **Note:** exposing the proxy to the LAN means any machine that can reach it can drive the app-registration/approval flow, so only enable it on networks you trust, and keep an eye on the tray's **Pending Approvals** and **Permission Requests** when you do.
+> **Note:** exposing the proxy to the LAN means any machine that can reach it can drive the app-registration/approval flow, so only enable it on networks you trust, and keep an eye on the window's **Requests** view when you do.
 
 ### Copying tokens to another computer
 

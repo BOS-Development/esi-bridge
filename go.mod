@@ -6,6 +6,7 @@ require (
 	fyne.io/systray v1.12.2
 	github.com/gen2brain/beeep v0.11.2
 	github.com/godbus/dbus/v5 v5.1.0
+	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
 	golang.org/x/crypto v0.55.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.47.0
