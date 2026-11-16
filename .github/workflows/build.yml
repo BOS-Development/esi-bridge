@@ -20,8 +20,8 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - run: go build ./...
@@ -40,8 +40,8 @@ jobs:
     runs-on: windows-latest
     environment: release
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Write .clientid
@@ -56,7 +56,7 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: ./scripts/package-windows.ps1 -Version $env:VERSION
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: dist/esi-proxy-*-windows-x64-setup.exe
@@ -68,8 +68,8 @@ jobs:
     runs-on: macos-latest
     environment: release
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Write .clientid
@@ -83,7 +83,7 @@ jobs:
           printf '%s' "$DEFAULT_CLIENTID" > .clientid
       - name: Build installer
         run: ./scripts/package-macos.sh "$VERSION"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-installer
           path: dist/esi-proxy-*-macos-universal.dmg
@@ -98,7 +98,7 @@ jobs:
       group: release
       cancel-in-progress: false
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
