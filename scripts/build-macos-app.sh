@@ -24,12 +24,26 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 # linkers both lack the flag and never emit the warning). Go's cgo flag
 # allowlist rejects this flag in a #cgo directive, so it's passed here via
 # -extldflags instead. Empty string = flag unsupported; safe under `set -u`.
-LDFLAGS_ARG=""
+LDFLAGS=""
 if ! ld -no_warn_duplicate_libraries 2>&1 | grep -q "unknown option"; then
-	LDFLAGS_ARG="-ldflags=-extldflags=-Wl,-no_warn_duplicate_libraries"
+	LDFLAGS="-extldflags=-Wl,-no_warn_duplicate_libraries"
 fi
 
-go build ${LDFLAGS_ARG} -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
+# The bundled EVE SSO Client ID is read from a .clientid file at the repo
+# root (gitignored). Without it the build has no bundled Client ID and users
+# must register their own application.
+if [[ -f .clientid ]]; then
+	CLIENT_ID="$(tr -d '[:space:]' < .clientid)"
+	if [[ ! "$CLIENT_ID" =~ ^[A-Za-z0-9]+$ ]]; then
+		echo "error: .clientid must contain only the EVE SSO Client ID (letters and digits)" >&2
+		exit 1
+	fi
+	LDFLAGS="${LDFLAGS} -X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=${CLIENT_ID}"
+else
+	echo "warning: no .clientid file; building without a bundled Client ID (users must set a custom one)" >&2
+fi
+
+go build -ldflags "${LDFLAGS}" -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
 
 cat > "$APP_DIR/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>

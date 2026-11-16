@@ -151,8 +151,8 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
-	if cfg.EVEClientID == "" {
-		log.Warn("eve_client_id is not set; use \"Set EVE Client ID\" in the tray before adding characters")
+	if cfg.ClientID() == "" {
+		log.Warn("no EVE client_id configured; set a custom Client ID in Settings before adding characters")
 	}
 
 	conn, err := db.Open(cfg.DataDir)
@@ -170,7 +170,7 @@ func run(log *slog.Logger) error {
 
 	st := store.New(conn)
 	redirectURL := urlscheme.Scheme + "://callback"
-	sso := esi.NewSSOHolder(esi.NewSSO(cfg.EVEClientID, cfg.EVESSOBaseURL, redirectURL, server.LoginScopes))
+	sso := esi.NewSSOHolder(esi.NewSSO(cfg.ClientID(), cfg.EVESSOBaseURL, redirectURL, server.LoginScopes))
 	esiClient := esi.NewClient(cfg.ESIBaseURL)
 	respCache := cache.New()
 	tokenMgr := tokens.NewManager(st, sso, masterKey)
@@ -263,7 +263,7 @@ func runServeUI(log *slog.Logger) error {
 
 	st := store.New(conn)
 	redirectURL := urlscheme.Scheme + "://callback"
-	sso := esi.NewSSOHolder(esi.NewSSO(cfg.EVEClientID, cfg.EVESSOBaseURL, redirectURL, server.LoginScopes))
+	sso := esi.NewSSOHolder(esi.NewSSO(cfg.ClientID(), cfg.EVESSOBaseURL, redirectURL, server.LoginScopes))
 	esiClient := esi.NewClient(cfg.ESIBaseURL)
 	respCache := cache.New()
 	tokenMgr := tokens.NewManager(st, sso, masterKey)

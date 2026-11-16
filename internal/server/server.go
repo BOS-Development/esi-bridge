@@ -38,7 +38,7 @@ type Server struct {
 	// surface is reachable only by local UI code holding this token.
 	sessionToken string
 
-	cfgMu sync.Mutex // guards persisting config.json from SetClientID
+	cfgMu sync.Mutex // guards read-modify-write of config.json
 
 	// rebind, if set, applies a new bind host to the live listener (and mDNS
 	// advert) and persists it via SetBindHost once the rebind succeeds. It's
@@ -77,11 +77,30 @@ func New(s *store.Store, sso *esi.SSOHolder, esiClient *esi.Client, c *cache.Cac
 	}
 }
 
-// SetClientID rebuilds the SSO client with a new EVE client_id and persists
-// it to config.json, taking effect immediately — no restart required.
+// SetClientID saves the user's own EVE client_id and switches to it (turning
+// on the custom-client-id setting), taking effect immediately — no restart
+// required.
 func (s *Server) SetClientID(clientID string) error {
-	s.sso.Set(esi.NewSSO(clientID, s.ssoBaseURL, s.redirectURL, LoginScopes))
+	custom := true
+	return s.updateClientIDConfig(func(cfg *config.Config) {
+		cfg.EVEClientID = clientID
+		cfg.UseCustomClientID = &custom
+	})
+}
 
+// SetUseCustomClientID switches between the bundled client_id (false) and
+// the user's saved one (true), taking effect immediately. Turning it on
+// before a custom client_id has been saved leaves logins disabled until one
+// is.
+func (s *Server) SetUseCustomClientID(enabled bool) error {
+	return s.updateClientIDConfig(func(cfg *config.Config) {
+		cfg.UseCustomClientID = &enabled
+	})
+}
+
+// updateClientIDConfig applies edit to config.json, persists it, and
+// rebuilds the SSO client with the resulting effective client_id.
+func (s *Server) updateClientIDConfig(edit func(cfg *config.Config)) error {
 	s.cfgMu.Lock()
 	defer s.cfgMu.Unlock()
 
@@ -89,8 +108,25 @@ func (s *Server) SetClientID(clientID string) error {
 	if err != nil {
 		return err
 	}
-	cfg.EVEClientID = clientID
-	return config.Save(s.dataDir, cfg)
+	edit(&cfg)
+	if err := config.Save(s.dataDir, cfg); err != nil {
+		return err
+	}
+	s.sso.Set(esi.NewSSO(cfg.ClientID(), s.ssoBaseURL, s.redirectURL, LoginScopes))
+	return nil
+}
+
+// ClientIDSettings reports whether the user's own client_id is selected and
+// the custom client_id saved in config.json (which may be set but unused).
+func (s *Server) ClientIDSettings() (custom bool, customID string, err error) {
+	s.cfgMu.Lock()
+	defer s.cfgMu.Unlock()
+
+	cfg, err := config.Load(s.dataDir)
+	if err != nil {
+		return false, "", err
+	}
+	return cfg.CustomClientID(), cfg.EVEClientID, nil
 }
 
 // ClientID returns the EVE client_id currently in use, for pre-filling the
@@ -174,6 +210,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /manage/pending-permissions/{id}/deny", s.requireSession(s.handleManageDenyPermission))
 	mux.HandleFunc("POST /manage/app-permissions/{id}/revoke", s.requireSession(s.handleManageRevokePermission))
 	mux.HandleFunc("POST /manage/client-id", s.requireSession(s.handleManageSetClientID))
+	mux.HandleFunc("POST /manage/custom-client-id", s.requireSession(s.handleManageSetUseCustomClientID))
 	mux.HandleFunc("POST /manage/bind-host", s.requireSession(s.handleManageSetBindHost))
 	return mux
 }

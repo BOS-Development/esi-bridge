@@ -6,23 +6,53 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 )
 
-// Config holds the settings needed to run the proxy. ClientID must be filled
-// in by the user on first run with a client_id from an EVE SSO application
-// registered at developers.eveonline.com (redirect URI must point at
-// http://localhost:<Port>/sso/callback).
+// Config holds the settings needed to run the proxy. By default the proxy
+// logs characters in with the EVE SSO application bundled with the build
+// (buildinfo.BundledClientID). A user can instead register their own
+// application at developers.eveonline.com (callback URL
+// eveauth-proxy://callback) and set UseCustomClientID + EVEClientID.
 type Config struct {
 	Port int `json:"port"`
 	// BindHost is the host the HTTP server binds to. The default,
 	// "localhost", keeps the token-holding proxy reachable only from this
 	// machine; set it to "0.0.0.0" (or a specific LAN address) to let other
 	// machines on the network connect to the proxy they discover over mDNS.
-	BindHost      string `json:"bind_host"`
-	DataDir       string `json:"data_dir"`
-	EVEClientID   string `json:"eve_client_id"`
-	EVESSOBaseURL string `json:"eve_sso_base_url"`
-	ESIBaseURL    string `json:"esi_base_url"`
+	BindHost string `json:"bind_host"`
+	DataDir  string `json:"data_dir"`
+	// EVEClientID is the user's own client_id, used only when
+	// CustomClientID() is true.
+	EVEClientID string `json:"eve_client_id"`
+	// UseCustomClientID selects EVEClientID over the bundled client_id.
+	// It's a pointer so configs written before the bundled ID existed (no
+	// field at all) keep using the client_id the user already entered.
+	UseCustomClientID *bool  `json:"use_custom_client_id,omitempty"`
+	EVESSOBaseURL     string `json:"eve_sso_base_url"`
+	ESIBaseURL        string `json:"esi_base_url"`
+}
+
+// CustomClientID reports whether the user's own client_id is in use rather
+// than the bundled one. It's forced on when the build has no bundled ID.
+func (c Config) CustomClientID() bool {
+	if buildinfo.BundledClientID == "" {
+		return true
+	}
+	if c.UseCustomClientID != nil {
+		return *c.UseCustomClientID
+	}
+	// Legacy config with no explicit choice: honour an ID the user entered.
+	return c.EVEClientID != ""
+}
+
+// ClientID returns the EVE SSO client_id the proxy should log in with.
+func (c Config) ClientID() string {
+	if c.CustomClientID() {
+		return c.EVEClientID
+	}
+	return buildinfo.BundledClientID
 }
 
 func defaults(dataDir string) Config {

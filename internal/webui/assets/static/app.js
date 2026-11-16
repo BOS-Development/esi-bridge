@@ -278,38 +278,95 @@ function viewSettings() {
   pageHeading(inner, "Settings");
   const s = lastState;
 
-  // EVE SSO Client ID
+  // EVE SSO Client ID: the bundled application by default, or the user's own.
   const clientBox = el("div", "setting");
-  clientBox.appendChild(el("label", "setting-label", "EVE SSO Client ID"));
-  const hint = el("p", "hint");
-  hint.append("Register an application at ");
+  const customLabel = el("label", "checkbox");
+  const custom = el("input");
+  custom.type = "checkbox";
+  custom.checked = !!s.use_custom_client_id;
+  // Builds without a bundled Client ID can only use a custom one.
+  custom.disabled = !s.bundled_client_id;
+  customLabel.append(custom, " Use a custom EVE SSO Client ID");
+  clientBox.appendChild(customLabel);
+  clientBox.appendChild(el("p", "hint", s.bundled_client_id
+    ? "By default esi-proxy logs characters in with its own built-in EVE application. Turn this on to use an application you registered yourself."
+    : "This build has no built-in EVE application, so you need to register your own."));
+
+  const customFields = el("div", "custom-client-id");
+  customFields.hidden = !custom.checked;
+
+  const steps = el("ol", "hint steps");
+  const step1 = el("li");
+  step1.append("Create an application at ");
   const link = el("a", null, "developers.eveonline.com");
   link.href = "https://developers.eveonline.com";
   link.target = "_blank";
   link.rel = "noopener";
-  hint.append(link, " (connection type Authentication & API Access), then paste its Client ID. Saved immediately — no restart needed.");
-  clientBox.appendChild(hint);
+  step1.append(link, ".");
+  const step2 = el("li");
+  step2.append("Set the connection type to ", el("strong", null, "Authentication & API Access"),
+    " and pick the ESI scopes you want characters to be able to grant.");
+  const step3 = el("li");
+  step3.append("Set the callback URL to exactly:");
+  const cbRow = el("div", "input-row");
+  const cbInput = el("input");
+  cbInput.type = "text";
+  cbInput.readOnly = true;
+  cbInput.value = s.callback_url || "";
+  cbInput.addEventListener("focus", () => cbInput.select());
+  const copyBtn = el("button", "btn", "Copy");
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(cbInput.value);
+      toast("Callback URL copied");
+    } catch {
+      cbInput.focus();
+      toast("Couldn't copy — select the URL and copy it manually", true);
+    }
+  });
+  cbRow.append(cbInput, copyBtn);
+  step3.appendChild(cbRow);
+  const step4 = el("li", null, "Paste the application's Client ID below. Saved immediately — no restart needed.");
+  steps.append(step1, step2, step3, step4);
+  customFields.appendChild(steps);
 
   const inputRow = el("div", "input-row");
   const input = el("input");
   input.type = "text";
   input.spellcheck = false;
   input.autocomplete = "off";
-  input.placeholder = s.client_id_set ? "a Client ID is set" : "paste Client ID";
+  input.placeholder = "paste Client ID";
+  input.value = s.custom_client_id || "";
   const saveBtn = el("button", "btn", "Save");
   inputRow.append(input, saveBtn);
-  clientBox.appendChild(inputRow);
-  clientBox.appendChild(el("p", "hint", s.client_id_set
-    ? "A Client ID is configured."
-    : "No Client ID set yet — add one to log in characters."));
+  customFields.appendChild(inputRow);
+  if (!s.client_id_set) {
+    customFields.appendChild(el("p", "hint", "No Client ID set yet — add one to log in characters."));
+  }
+  customFields.appendChild(el("p", "hint",
+    "Characters added with one Client ID can't refresh their tokens under another. After switching, re-add them."));
+  clientBox.appendChild(customFields);
   inner.appendChild(clientBox);
+
+  custom.addEventListener("change", async () => {
+    const enabled = custom.checked;
+    customFields.hidden = !enabled;
+    try {
+      await api("POST", "/manage/custom-client-id", { enabled });
+      toast(enabled ? "Using custom Client ID" : "Using built-in Client ID");
+      await refreshState();
+    } catch (err) {
+      custom.checked = !enabled;
+      customFields.hidden = !custom.checked;
+      toast(err.message, true);
+    }
+  });
 
   saveBtn.addEventListener("click", async () => {
     const clientID = input.value.trim();
     if (!clientID) { toast("Enter a Client ID first", true); return; }
     try {
       await api("POST", "/manage/client-id", { client_id: clientID });
-      input.value = "";
       toast("Client ID saved");
       await refreshState();
     } catch (err) {

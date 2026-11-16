@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 	"github.com/BOS-Development/esi-proxy/internal/store"
 	"github.com/BOS-Development/esi-proxy/internal/webui"
 )
@@ -131,7 +132,16 @@ type manageAppPermission struct {
 // manageState is the single snapshot the UI polls, mirroring everything the
 // old tray rendered across its five sections plus the settings it exposed.
 type manageState struct {
-	ClientIDSet        bool                      `json:"client_id_set"`
+	ClientIDSet bool `json:"client_id_set"`
+	// UseCustomClientID is true when the user's own EVE application is in
+	// use instead of the one bundled with the build; BundledClientID says
+	// whether this build has one at all (if not, custom is forced on).
+	UseCustomClientID bool   `json:"use_custom_client_id"`
+	BundledClientID   bool   `json:"bundled_client_id"`
+	CustomClientID    string `json:"custom_client_id"`
+	// CallbackURL is the redirect URI a custom EVE application must be
+	// registered with.
+	CallbackURL        string                    `json:"callback_url"`
 	BindHost           string                    `json:"bind_host"`
 	LANAccess          bool                      `json:"lan_access"`
 	Characters         []manageCharacter         `json:"characters"`
@@ -226,8 +236,18 @@ func (s *Server) handleManageState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	useCustom, customID, err := s.ClientIDSettings()
+	if err != nil {
+		s.manageError(w, "read client id settings", err)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, manageState{
 		ClientIDSet:        s.ClientID() != "",
+		UseCustomClientID:  useCustom,
+		BundledClientID:    buildinfo.BundledClientID != "",
+		CustomClientID:     customID,
+		CallbackURL:        s.redirectURL,
 		BindHost:           bindHost,
 		LANAccess:          isLANBindHost(bindHost),
 		Characters:         outChars,
@@ -412,6 +432,31 @@ func (s *Server) handleManageSetClientID(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.log.Info("eve client id updated")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type setUseCustomClientIDRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// handleManageSetUseCustomClientID switches between the bundled EVE
+// application and the user's own. Builds without a bundled client_id can't
+// turn custom off.
+func (s *Server) handleManageSetUseCustomClientID(w http.ResponseWriter, r *http.Request) {
+	var req setUseCustomClientIDRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "body must be JSON with an \"enabled\" boolean", http.StatusBadRequest)
+		return
+	}
+	if !req.Enabled && buildinfo.BundledClientID == "" {
+		http.Error(w, "this build has no bundled client ID; a custom client ID is required", http.StatusBadRequest)
+		return
+	}
+	if err := s.SetUseCustomClientID(req.Enabled); err != nil {
+		s.manageError(w, "save client id setting", err)
+		return
+	}
+	s.log.Info("eve client id source updated", "custom", req.Enabled)
 	w.WriteHeader(http.StatusNoContent)
 }
 

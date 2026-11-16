@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
+
+	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 )
 
 var tokenRe = regexp.MustCompile(`name="session-token" content="([0-9a-f]+)"`)
@@ -489,5 +491,47 @@ func TestManageSetClientIDRejectsEmpty(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("valid client_id: status = %d, want 204", resp.StatusCode)
+	}
+}
+
+func TestManageToggleCustomClientID(t *testing.T) {
+	prev := buildinfo.BundledClientID
+	buildinfo.BundledClientID = "bundled-id"
+	t.Cleanup(func() { buildinfo.BundledClientID = prev })
+
+	ts, _, _ := newTestServer(t)
+	token := uiToken(t, ts)
+
+	resp := manageReq(t, ts, http.MethodPost, "/manage/client-id", token, map[string]any{"client_id": "my-id"})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("set client_id: status = %d, want 204", resp.StatusCode)
+	}
+	state := manageState(t, ts, token)
+	if custom, _ := state["use_custom_client_id"].(bool); !custom {
+		t.Fatalf("use_custom_client_id after saving an ID = %v, want true", state["use_custom_client_id"])
+	}
+	if cb, _ := state["callback_url"].(string); cb == "" {
+		t.Fatalf("callback_url is empty")
+	}
+
+	resp = manageReq(t, ts, http.MethodPost, "/manage/custom-client-id", token, map[string]any{"enabled": false})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("disable custom: status = %d, want 204", resp.StatusCode)
+	}
+	state = manageState(t, ts, token)
+	if custom, _ := state["use_custom_client_id"].(bool); custom {
+		t.Fatalf("use_custom_client_id after disabling = true, want false")
+	}
+	if id, _ := state["custom_client_id"].(string); id != "my-id" {
+		t.Fatalf("custom_client_id = %q, want saved ID kept", id)
+	}
+
+	buildinfo.BundledClientID = ""
+	resp = manageReq(t, ts, http.MethodPost, "/manage/custom-client-id", token, map[string]any{"enabled": false})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("disable custom without bundled ID: status = %d, want 400", resp.StatusCode)
 	}
 }

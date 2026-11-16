@@ -32,15 +32,17 @@ Proxies all Eve Online ESI connections, allowing applications to access characte
 
 esi-proxy is a single Go binary with a desktop app window (backed by a small background tray/menu-bar presence) — no separate services to run.
 
-### 1. Register an EVE SSO application
+### 1. (Optional) Register your own EVE SSO application
 
-Go to [developers.eveonline.com](https://developers.eveonline.com) and create an application:
+esi-proxy ships with a built-in EVE SSO application, so you can skip this step. If you'd rather log in through an application you control, go to [developers.eveonline.com](https://developers.eveonline.com) and create one:
 
 * Connection Type: **Authentication & API Access**
 * Callback URL: `eveauth-proxy://callback` — a custom URL scheme, not an `http://` address (matches the convention other EVE community tools use, e.g. `eveauth-pyfa`). esi-proxy registers itself as this scheme's OS handler on every startup; see the platform notes below.
 * Scopes: whatever ESI scopes you want the proxy able to request on your characters' behalf (see `server.LoginScopes` in `internal/server/sso.go` for the defaults)
 
-Copy the generated **Client ID**.
+Copy the generated **Client ID**. Characters are tied to the Client ID they were added with, so pick one before adding characters (switching later means re-adding them).
+
+The built-in Client ID is injected at build time: the `scripts/build-*` scripts read it from a `.clientid` file at the repo root (gitignored — create it with just the Client ID inside) and pass it to `go build` as `-ldflags "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=<id>"`. Without that file the build has no bundled ID, and users must set a custom one.
 
 ### 2. Build and run
 
@@ -76,7 +78,7 @@ open "ESI Proxy.app"
 
 The Windows and Linux scripts are thin wrappers around `go build -o esi-proxy[.exe] ./cmd/esi-proxy` — feel free to invoke that directly instead.
 
-The **ESI Proxy** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Proxy** in that menu re-opens it). In **Settings**, paste the Client ID from step 1 — it's saved and takes effect immediately, no restart needed — then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
+The **ESI Proxy** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Proxy** in that menu re-opens it). If you registered your own application in step 1, open **Settings**, tick **Use a custom EVE SSO Client ID**, and paste its Client ID — it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
 
 The management UI is served over a loopback-only HTTP endpoint, so it also remains reachable in a browser at `http://localhost:8085/app` if you prefer that.
 

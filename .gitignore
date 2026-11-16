@@ -10,6 +10,9 @@
 /dist/
 /bin/
 
+# Bundled EVE SSO Client ID, read by scripts/build-*
+/.clientid
+
 # Go
 *.test
 *.out

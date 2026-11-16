@@ -94,7 +94,7 @@ var LoginScopes = []string{
 // returning the URL to open in the user's browser.
 func (s *Server) BeginLogin(accountID int64) (string, error) {
 	if s.ClientID() == "" {
-		return "", fmt.Errorf("eve_client_id is not set — use \"Set EVE Client ID\" in the tray first")
+		return "", fmt.Errorf("no EVE client_id is configured — set a custom Client ID in Settings first")
 	}
 
 	state, err := randomState()
