@@ -170,6 +170,42 @@ h1.page-title {
 
 .row .actions { display: flex; gap: 0.45rem; flex-shrink: 0; }
 
+/* collapsible row: the title is a disclosure toggle; details show when open */
+.row-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.row-toggle:hover .title { color: var(--accent); }
+.row-toggle .toggle-icon {
+  display: inline-block;
+  width: 0.7rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+.row-toggle[aria-expanded="true"] .toggle-icon { transform: rotate(90deg); }
+.row-details { padding-left: 1.1rem; margin-top: 0.15rem; }
+
+/* Bulk actions (Approve all / Deny all) sit on the right of a group label. */
+.group-label.has-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.group-actions { display: flex; gap: 0.45rem; text-transform: none; letter-spacing: normal; }
+.group-actions .btn { font-size: 0.75rem; padding: 0.22rem 0.6rem; }
+
 .empty { color: var(--muted); font-style: italic; padding: 0.4rem 0.25rem; }
 
 /* --- token info panel (character detail) --- */
@@ -194,6 +230,7 @@ h1.page-title {
 /* --- danger zone (character detail) --- */
 .danger-zone .group-label { color: var(--danger); border-bottom-color: var(--danger); }
 .danger-zone .hint { margin: 0.5rem 0.25rem; }
+.danger-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 
 /* --- confirmation modal --- */
 .modal-overlay {
@@ -283,6 +320,21 @@ h1.page-title {
 .hint.steps strong { color: var(--text); font-weight: 600; }
 .hint.steps .input-row { margin: 0.35rem 0 0; }
 .input-row input[readonly] { color: var(--muted); }
+/* search box above a list (Characters) */
+input.search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 1.25rem;
+  font: inherit;
+  padding: 0.42rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+input.search:focus { outline: none; border-color: var(--accent); }
+
 .input-row { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
 .input-row input[type="text"] {
   flex: 1;

@@ -27,9 +27,9 @@ persistent; only the content pane changes.
   the running-status text and the primary **Add Character** action on the
   right. Present on every view.
 - **Sidebar** (left, hairline right border): one nav link per view —
-  Requests, Characters, Grants, Permissions, Settings. The active link is
+  Characters, Applications, Pending Requests, Settings. The active link is
   marked with `--accent` text and a 2px `--accent` left edge, not a filled
-  box. Action-bearing links (Requests) show a muted item count. On narrow
+  box. Action-bearing links (Pending Requests) show a muted item count. On narrow
   widths the sidebar collapses to a horizontal, scrollable nav strip above the
   content.
 - **Content pane** (`--bg`): shows exactly one view at a time, chosen by a
@@ -42,29 +42,46 @@ persistent; only the content pane changes.
 - **Characters** — the default, primary view: every character on the proxy,
   with its account and how many applications have access. Each row is a whole
   navigation target (→ character detail), marked with a chevron, not a button.
-- **Requests** — the inbox of things awaiting the user: pending access
-  requests and pending permission requests, each with Approve/Deny. Its nav
-  item shows a count.
-- **Grants** — all active per-character grants, each with Edit and Revoke.
-- **Permissions** — app-wide permissions granted, each with Revoke.
-- **Settings** — EVE SSO Client ID and LAN access.
+- **Applications** — every application holding a per-character grant or an
+  app-wide permission, with how many characters it is authorized for. Rows are
+  navigation targets (→ application detail), like Characters.
+- **Pending Requests** (`#/requests`) — the inbox of things awaiting the user:
+  pending access requests and pending permission requests, each with
+  Approve/Deny, plus Approve all / Deny all per group. Its nav item shows a
+  count.
+- **Settings** — EVE SSO Client ID (the bundled one by default; a
+  "Use a custom EVE SSO Client ID" checkbox reveals registration steps,
+  the callback URL with a Copy button, and the Client ID field) and LAN access. Development builds
+  (the default; not built with `-tags release`) add a **Developer** section below these, with a "Send test
+  notification" button.
 
-### Drill-in (nested under Characters)
+### Drill-in (nested under Characters and Applications)
 
-Navigation goes three levels deep under Characters; the sidebar keeps
-Characters highlighted throughout, and each nested view starts with a `‹` back
-link, never a browser-only back.
+Navigation goes three levels deep under Characters and Applications; the
+sidebar keeps the parent section highlighted throughout, and each nested view
+starts with a `‹` back link, never a browser-only back.
+
+- **Application detail** (`#/applications/{id}`) — an "Authorized characters"
+  group (per character: **Edit permissions** → scope editor, **Revoke**), an
+  "App-wide permissions" group (each with **Revoke**), and a "Danger zone"
+  with **Revoke all permissions** (every grant and app-wide permission, after
+  a confirmation modal).
 
 - **Character detail** (`#/characters/{id}`) — the character, a "Tokens" group
   showing the access-token expiry, when the token pair was last refreshed and
   when the character was added (relative ages, with absolute times on hover)
   plus a **Refresh tokens** button that forces an immediate SSO refresh, then a
   group "Applications with access" listing each application that holds a grant
-  for it and the permissions granted. Per application: **Revoke** (drop all its
+  for it. Each row is collapsed to the application name (with a `›`
+  disclosure toggle); expanding it shows the permission count and the granted
+  scopes, and stays open across the background poll. Per application: **Revoke** (drop all its
   access to this character) and **Edit permissions** (→ scope editor). A
-  "Danger zone" group ends the page with **Delete character**, which removes
-  the character (tokens and all grants) after a confirmation modal.
-- **Scope editor** (`#/characters/{id}/grants/{grantId}`) — a checklist of the
+  "Danger zone" group ends the page with **Revoke all applications** (drops
+  every grant, keeps the character) and **Delete character**, which removes
+  the character (tokens and all grants); both use a confirmation modal.
+- **Scope editor** (`#/characters/{id}/grants/{grantId}` or
+  `#/applications/{id}/grants/{grantId}`, returning to whichever parent it was
+  opened from) — a checklist of the
   ESI permissions the application may use for this character: the character's
   available (token) scopes unioned with whatever the grant already holds, the
   granted ones ticked. Select-all / Clear, then **Save** (≥1 required),

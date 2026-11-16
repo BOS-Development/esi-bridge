@@ -5,7 +5,7 @@
 const TOKEN = document.querySelector('meta[name="session-token"]').content;
 
 const REFRESH_MS = 3000;
-const SECTIONS = ["characters", "requests", "grants", "permissions", "settings"];
+const SECTIONS = ["characters", "applications", "requests", "settings"];
 const DEFAULT_SECTION = "characters";
 
 const PERMISSION_LABELS = {
@@ -19,6 +19,8 @@ let lastState = null;
 // suppressAutoRender is set while a self-managed view (the scope editor) is on
 // screen, so the 3s poll doesn't wipe in-progress edits by re-rendering.
 let suppressAutoRender = false;
+// expandedRows holds the keys of collapsible rows the user has opened.
+const expandedRows = new Set();
 
 // --- /manage API ---
 
@@ -142,12 +144,38 @@ function absoluteTime(iso) {
 // row builds a flat list entry: an info block plus optional action controls.
 // actions is an array of {label, cls, done, onClick} (a button that calls the
 // API) or {label, cls, href} (a link that navigates).
-function row(title, subtitle, scopes, actions) {
+//
+// opts.expandKey makes the row collapsible: only the title shows until it is
+// clicked, then the subtitle and scopes appear. Expanded keys live in
+// expandedRows so a row stays open across the 3s poll re-render.
+function row(title, subtitle, scopes, actions, opts) {
   const r = el("div", "row");
   const info = el("div", "info");
-  info.appendChild(el("div", "title", title));
-  if (subtitle) info.appendChild(el("div", "sub", subtitle));
-  if (scopes && scopes.length) info.appendChild(scopesEl(scopes));
+  const details = [];
+  if (subtitle) details.push(el("div", "sub", subtitle));
+  if (scopes && scopes.length) details.push(scopesEl(scopes));
+
+  const key = opts && opts.expandKey;
+  if (key) {
+    const expanded = expandedRows.has(key);
+    const toggle = el("button", "row-toggle");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.append(el("span", "toggle-icon", "›"), el("span", "title", title));
+    const body = el("div", "row-details");
+    body.append(...details);
+    body.hidden = !expanded;
+    toggle.addEventListener("click", () => {
+      const open = body.hidden;
+      body.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) expandedRows.add(key); else expandedRows.delete(key);
+    });
+    info.append(toggle, body);
+  } else {
+    info.appendChild(el("div", "title", title));
+    info.append(...details);
+  }
   r.appendChild(info);
 
   if (actions && actions.length) {
@@ -190,10 +218,17 @@ function linkRow(title, subtitle, href) {
   return a;
 }
 
-// group builds a labelled set of rows, or an empty-state line.
-function group(label, items, emptyText, build) {
+// group builds a labelled set of rows, or an empty-state line. headerActions,
+// if given, is a DOM node placed on the right of the group label.
+function group(label, items, emptyText, build, headerActions) {
   const g = el("div", "group");
-  g.appendChild(el("div", "group-label", label));
+  const header = el("div", "group-label");
+  header.appendChild(el("span", null, label));
+  if (headerActions && items.length) {
+    header.classList.add("has-actions");
+    header.appendChild(headerActions);
+  }
+  g.appendChild(header);
   if (!items.length) {
     g.appendChild(el("div", "empty", emptyText));
     return g;
@@ -217,60 +252,288 @@ function grantsForCharacter(id) {
   return (lastState.active_grants || []).filter((g) => g.character_id === id);
 }
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// applications derives the list of applications that hold anything — a
+// per-character grant or an app-wide permission — from the state. Sorted by
+// name; each entry carries its grants and permissions.
+function applications() {
+  const byId = new Map();
+  const entry = (id, name) => {
+    if (!byId.has(id)) byId.set(id, { id, name, grants: [], permissions: [] });
+    return byId.get(id);
+  };
+  (lastState.active_grants || []).forEach((g) => entry(g.application_id, g.application_name).grants.push(g));
+  (lastState.app_permissions || []).forEach((p) => entry(p.application_id, p.application_name).permissions.push(p));
+  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// postAll POSTs to each path in turn, continuing past failures, and reports
+// how many failed and the last error. Used by the bulk actions.
+async function postAll(paths) {
+  let failed = 0;
+  let lastErr;
+  for (const path of paths) {
+    try {
+      await api("POST", path);
+    } catch (err) {
+      failed++;
+      lastErr = err;
+    }
+  }
+  return { failed, lastErr };
+}
+
+// bulkRevoke confirms, then revokes the given grants and app-wide
+// permissions. Like the bulk request actions it acts on exactly the IDs on
+// screen when the user clicked. Returns true when everything was revoked.
+async function bulkRevoke({ title, message, confirmLabel, grants = [], permissions = [] }) {
+  const ok = await confirmDialog({ title, message, confirmLabel, danger: true });
+  if (!ok) return false;
+  const paths = [
+    ...grants.map((g) => `/manage/grants/${g.id}/revoke`),
+    ...permissions.map((p) => `/manage/app-permissions/${p.id}/revoke`),
+  ];
+  suppressAutoRender = true;
+  let result;
+  try {
+    result = await postAll(paths);
+  } finally {
+    suppressAutoRender = false;
+  }
+  if (result.failed) {
+    toast(`Revoked ${paths.length - result.failed} of ${paths.length}; ${result.failed} failed: ${result.lastErr.message}`, true);
+  } else {
+    toast("Access revoked");
+  }
+  await refreshState();
+  return !result.failed;
+}
+
+// dangerButton is a destructive button inside a danger-zone group; onClick
+// runs with the button disabled and re-enables it afterwards.
+function dangerButton(label, onClick) {
+  const b = el("button", "btn revoke", label);
+  b.addEventListener("click", async () => {
+    b.disabled = true;
+    try {
+      await onClick();
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      b.disabled = false;
+    }
+  });
+  return b;
+}
+
 // --- top-level views ---
+
+// searchQueries holds each search box's text by key. It lives outside the
+// views so it survives the 3s poll re-render (renderView also restores
+// focus/caret on the box).
+const searchQueries = new Map();
+
+// searchableGroup appends a live name filter and the group it filters to
+// parent. items are filtered by nameOf(item) containing the query (case-
+// insensitive); buildGroup(shown, emptyText) returns the group node. Only the
+// group is swapped on each keystroke, so the input keeps focus while typing.
+function searchableGroup(parent, { key, placeholder, items, nameOf, emptyText, buildGroup }) {
+  const query = () => searchQueries.get(key) || "";
+
+  const search = el("input", "search");
+  search.type = "search";
+  search.id = `search-${key}`;
+  search.placeholder = placeholder;
+  search.autocomplete = "off";
+  search.spellcheck = false;
+  search.setAttribute("aria-label", placeholder);
+  search.value = query();
+
+  const build = () => {
+    const q = query().trim().toLowerCase();
+    const shown = q ? items.filter((i) => (nameOf(i) || "").toLowerCase().includes(q)) : items;
+    const empty = items.length && q ? `No characters match “${query().trim()}”.` : emptyText;
+    return buildGroup(shown, empty);
+  };
+
+  let list = build();
+  parent.append(search, list);
+  search.addEventListener("input", () => {
+    searchQueries.set(key, search.value);
+    const next = build();
+    list.replaceWith(next);
+    list = next;
+  });
+  search.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && search.value) {
+      e.preventDefault();
+      search.value = "";
+      search.dispatchEvent(new Event("input"));
+    }
+  });
+}
 
 function viewCharacters() {
   const inner = el("div", "view-inner");
   pageHeading(inner, "Characters");
-  inner.appendChild(group("On this proxy", lastState.characters || [], "No characters added yet — use Add Character.", (c) => {
-    const n = grantsForCharacter(c.id).length;
-    const sub = [c.account_name ? `Account: ${c.account_name}` : null,
-      n ? `${n} application${n === 1 ? "" : "s"} with access` : "No application access"]
-      .filter(Boolean).join(" · ");
-    return linkRow(c.name, sub, `#/characters/${c.id}`);
-  }));
+  searchableGroup(inner, {
+    key: "characters",
+    placeholder: "Search characters by name",
+    items: lastState.characters || [],
+    nameOf: (c) => c.name,
+    emptyText: "No characters added yet — use Add Character.",
+    buildGroup: (shown, empty) => group("On this proxy", shown, empty, (c) => {
+      const n = grantsForCharacter(c.id).length;
+      const sub = [c.account_name ? `Account: ${c.account_name}` : null,
+        n ? `${plural(n, "application")} with access` : "No application access"]
+        .filter(Boolean).join(" · ");
+      return linkRow(c.name, sub, `#/characters/${c.id}`);
+    }),
+  });
   return inner;
+}
+
+// bulkRequestActions builds "Approve all" / "Deny all" buttons for a list of
+// pending requests. It acts on exactly the IDs on screen at click time (not
+// whatever is pending server-side by then), so a request that arrives after
+// the user looked is never approved sight-unseen. basePath is e.g.
+// "/manage/pending-grants"; noun is the plural used in messages.
+function bulkRequestActions(items, basePath, noun) {
+  const wrap = el("div", "group-actions");
+  const approveBtn = el("button", "btn approve", "Approve all");
+  const denyBtn = el("button", "btn deny", "Deny all");
+  wrap.append(approveBtn, denyBtn);
+
+  const ids = items.map((p) => p.id);
+  const count = `${ids.length} ${noun}`;
+
+  async function runAll(action, doneVerb) {
+    approveBtn.disabled = denyBtn.disabled = true;
+    // Pause re-rendering so the poll doesn't rebuild these buttons mid-run.
+    suppressAutoRender = true;
+    let failed, lastErr;
+    try {
+      ({ failed, lastErr } = await postAll(ids.map((id) => `${basePath}/${id}/${action}`)));
+    } finally {
+      suppressAutoRender = false;
+    }
+    if (failed) {
+      toast(`${doneVerb} ${ids.length - failed} of ${ids.length}; ${failed} failed: ${lastErr.message}`, true);
+    } else {
+      toast(`${doneVerb} ${count}`);
+    }
+    await refreshState();
+  }
+
+  approveBtn.addEventListener("click", async () => {
+    const ok = await confirmDialog({
+      title: `Approve all ${count}?`,
+      message: "Every request listed will be granted. Review them first if you're not sure where they came from.",
+      confirmLabel: "Approve all",
+    });
+    if (ok) await runAll("approve", "Approved");
+  });
+  denyBtn.addEventListener("click", () => runAll("deny", "Denied"));
+  return wrap;
 }
 
 function viewRequests() {
   const inner = el("div", "view-inner");
-  pageHeading(inner, "Requests");
-  inner.appendChild(group("Access requests", lastState.pending_grants || [], "No pending access requests", (p) =>
+  pageHeading(inner, "Pending Requests");
+  const grants = lastState.pending_grants || [];
+  inner.appendChild(group("Access requests", grants, "No pending access requests", (p) =>
     row(`${p.application_name} → ${p.character_name}`, "wants access to this character", p.scopes, [
       { label: "Approve", cls: "approve", done: "Approved", onClick: () => api("POST", `/manage/pending-grants/${p.id}/approve`) },
       { label: "Deny", cls: "deny", done: "Denied", onClick: () => api("POST", `/manage/pending-grants/${p.id}/deny`) },
-    ])
+    ]),
+    bulkRequestActions(grants, "/manage/pending-grants", "access requests")
   ));
-  inner.appendChild(group("Permission requests", lastState.pending_permissions || [], "No pending permission requests", (p) =>
+  const perms = lastState.pending_permissions || [];
+  inner.appendChild(group("Permission requests", perms, "No pending permission requests", (p) =>
     row(p.application_name, `wants to ${permissionLabel(p.permission)}`, null, [
       { label: "Approve", cls: "approve", done: "Approved", onClick: () => api("POST", `/manage/pending-permissions/${p.id}/approve`) },
       { label: "Deny", cls: "deny", done: "Denied", onClick: () => api("POST", `/manage/pending-permissions/${p.id}/deny`) },
-    ])
+    ]),
+    bulkRequestActions(perms, "/manage/pending-permissions", "permission requests")
   ));
   return inner;
 }
 
-function viewGrants() {
+function viewApplications() {
   const inner = el("div", "view-inner");
-  pageHeading(inner, "Grants");
-  inner.appendChild(group("Active per-character grants", lastState.active_grants || [], "No active grants", (g) =>
-    row(`${g.application_name} → ${g.character_name}`, null, g.scopes, [
-      { label: "Edit", cls: "", href: `#/characters/${g.character_id}/grants/${g.id}` },
-      { label: "Revoke", cls: "revoke", done: "Revoked", onClick: () => api("POST", `/manage/grants/${g.id}/revoke`) },
-    ])
-  ));
+  pageHeading(inner, "Applications");
+  inner.appendChild(group("With permissions", applications(), "No application holds any permissions.", (app) => {
+    const parts = [];
+    if (app.grants.length) parts.push(`${plural(app.grants.length, "character")} authorized`);
+    if (app.permissions.length) parts.push(plural(app.permissions.length, "app-wide permission"));
+    return linkRow(app.name, parts.join(" · "), `#/applications/${app.id}`);
+  }));
   return inner;
 }
 
-function viewPermissions() {
+// --- application detail: characters an app may use, and its app-wide permissions ---
+
+function renderApplicationDetail(id) {
   const inner = el("div", "view-inner");
-  pageHeading(inner, "Permissions");
-  inner.appendChild(group("App-wide permissions", lastState.app_permissions || [], "No app permissions granted", (p) =>
-    row(p.application_name, permissionLabel(p.permission), null, [
+  inner.appendChild(backLink("#/applications", "Applications"));
+
+  const app = applications().find((a) => a.id === id);
+  if (!app) {
+    pageHeading(inner, "Application");
+    inner.appendChild(el("div", "empty", "This application no longer holds any permissions."));
+    viewEl.replaceChildren(inner);
+    return;
+  }
+
+  pageHeading(inner, app.name);
+
+  // Search only when there's a list to search.
+  const buildAuthorized = (shown, empty) => group("Authorized characters", shown, empty, (g) => {
+    const n = g.scopes ? g.scopes.length : 0;
+    return row(g.character_name, `${plural(n, "permission")} granted`, g.scopes, [
+      { label: "Edit permissions", cls: "", href: `#/applications/${id}/grants/${g.id}` },
+      { label: "Revoke", cls: "revoke", done: "Access revoked", onClick: () => api("POST", `/manage/grants/${g.id}/revoke`) },
+    ]);
+  });
+  if (app.grants.length) {
+    searchableGroup(inner, {
+      key: `app-${id}-characters`,
+      placeholder: "Search characters by name",
+      items: app.grants,
+      nameOf: (g) => g.character_name,
+      emptyText: "Not authorized for any character.",
+      buildGroup: buildAuthorized,
+    });
+  } else {
+    inner.appendChild(buildAuthorized([], "Not authorized for any character."));
+  }
+
+  inner.appendChild(group("App-wide permissions", app.permissions, "No app-wide permissions.", (p) =>
+    row(permissionLabel(p.permission), null, null, [
       { label: "Revoke", cls: "revoke", done: "Revoked", onClick: () => api("POST", `/manage/app-permissions/${p.id}/revoke`) },
     ])
   ));
-  return inner;
+
+  const dz = el("div", "group danger-zone");
+  dz.appendChild(el("div", "group-label", "Danger zone"));
+  dz.appendChild(el("p", "hint",
+    "Revoking everything removes this application's access to every character and all of its app-wide permissions. It would have to request access again."));
+  const actions = el("div", "token-actions");
+  actions.appendChild(dangerButton("Revoke all permissions", async () => {
+    const done = await bulkRevoke({
+      title: "Revoke all permissions?",
+      message: `${app.name} will lose access to ${plural(app.grants.length, "character")} and ${plural(app.permissions.length, "app-wide permission")}.`,
+      confirmLabel: "Revoke all",
+      grants: app.grants,
+      permissions: app.permissions,
+    });
+    if (done) location.hash = "#/applications";
+  }));
+  dz.appendChild(actions);
+  inner.appendChild(dz);
+
+  viewEl.replaceChildren(inner);
 }
 
 function viewSettings() {
@@ -436,9 +699,8 @@ function devSettings() {
 
 const TOP_VIEWS = {
   characters: viewCharacters,
+  applications: viewApplications,
   requests: viewRequests,
-  grants: viewGrants,
-  permissions: viewPermissions,
   settings: viewSettings,
 };
 
@@ -513,28 +775,36 @@ function renderCharacterDetail(id) {
   const grants = grantsForCharacter(id);
   inner.appendChild(group("Applications with access", grants, "No applications have access to this character.", (g) => {
     const n = g.scopes ? g.scopes.length : 0;
-    return row(g.application_name, `${n} permission${n === 1 ? "" : "s"} granted`, g.scopes, [
+    return row(g.application_name, `${plural(n, "permission")} granted`, g.scopes, [
       { label: "Edit permissions", cls: "", href: `#/characters/${id}/grants/${g.id}` },
       { label: "Revoke", cls: "revoke", done: "Access revoked", onClick: () => api("POST", `/manage/grants/${g.id}/revoke`) },
-    ]);
+    ], { expandKey: `grant-${g.id}` });
   }));
 
-  inner.appendChild(dangerZone(character));
+  inner.appendChild(dangerZone(character, grants));
 
   viewEl.replaceChildren(inner);
 }
 
-// dangerZone holds the character-level destructive action: removing the
-// character (and its tokens/grants) from the proxy, behind a confirmation.
-function dangerZone(character) {
+// dangerZone holds the character-level destructive actions, each behind a
+// confirmation: revoking every application's access (keeping the character),
+// and removing the character (and its tokens/grants) from the proxy.
+function dangerZone(character, grants) {
   const g = el("div", "group danger-zone");
   g.appendChild(el("div", "group-label", "Danger zone"));
   g.appendChild(el("p", "hint",
-    "Removing a character deletes its stored tokens and revokes every application's access to it. To use it again you'd log it in from scratch."));
+    "Revoking all applications keeps the character but removes every application's access to it. Deleting the character also removes its stored tokens; to use it again you'd log it in from scratch."));
 
-  const actions = el("div", "token-actions");
-  const del = el("button", "btn revoke", "Delete character");
-  del.addEventListener("click", async () => {
+  const actions = el("div", "token-actions danger-actions");
+  if (grants.length) {
+    actions.appendChild(dangerButton("Revoke all applications", () => bulkRevoke({
+      title: "Revoke all applications?",
+      message: `${plural(grants.length, "application")} will lose access to ${character.name}. The character stays on the proxy.`,
+      confirmLabel: "Revoke all",
+      grants,
+    })));
+  }
+  actions.appendChild(dangerButton("Delete character", async () => {
     const ok = await confirmDialog({
       title: "Delete character?",
       message: `${character.name} will be removed from the proxy, along with its stored tokens and every application's access to it. This can't be undone.`,
@@ -542,30 +812,29 @@ function dangerZone(character) {
       danger: true,
     });
     if (!ok) return;
-    del.disabled = true;
-    try {
-      await api("DELETE", `/manage/characters/${character.id}`);
-      toast("Character deleted");
-      location.hash = "#/characters";
-      await refreshState();
-    } catch (err) {
-      del.disabled = false;
-      toast(err.message, true);
-    }
-  });
-  actions.appendChild(del);
+    await api("DELETE", `/manage/characters/${character.id}`);
+    toast("Character deleted");
+    location.hash = "#/characters";
+    await refreshState();
+  }));
   g.appendChild(actions);
   return g;
 }
 
 // --- scope editor: update the specific permissions a grant holds ---
 
-async function renderGrantScopes(charId, grantId) {
+// renderGrantScopes is reachable from a character (#/characters/{id}/grants/
+// {grantId}) or an application (#/applications/{id}/grants/{grantId});
+// parent says which, and is where Back/Save/Revoke return to.
+async function renderGrantScopes(parent, grantId) {
   const hashAtStart = location.hash;
-  const grant = (lastState.active_grants || []).find((g) => g.id === grantId && g.character_id === charId);
+  const grant = (lastState.active_grants || []).find((g) => g.id === grantId &&
+    (parent.kind === "characters" ? g.character_id : g.application_id) === parent.id);
+  const backHref = `#/${parent.kind}/${parent.id}`;
+  const charId = grant ? grant.character_id : null;
 
   const inner = el("div", "view-inner");
-  inner.appendChild(backLink(`#/characters/${charId}`, "Back to character"));
+  inner.appendChild(backLink(backHref, parent.kind === "characters" ? "Back to character" : "Back to application"));
 
   if (!grant) {
     pageHeading(inner, "Edit permissions");
@@ -622,7 +891,7 @@ async function renderGrantScopes(charId, grantId) {
   const footer = el("div", "editor-footer");
   const save = el("button", "btn primary", "Save permissions");
   const cancel = el("a", "btn", "Cancel");
-  cancel.href = `#/characters/${charId}`;
+  cancel.href = backHref;
   const revoke = el("button", "btn revoke", "Revoke access");
   footer.append(save, cancel, revoke);
   inner.appendChild(footer);
@@ -638,7 +907,7 @@ async function renderGrantScopes(charId, grantId) {
       await api("POST", `/manage/grants/${grantId}/scopes`, { scopes });
       toast("Permissions updated");
       await refreshState();
-      location.hash = `#/characters/${charId}`;
+      location.hash = backHref;
     } catch (err) {
       save.disabled = false;
       toast(err.message, true);
@@ -651,7 +920,7 @@ async function renderGrantScopes(charId, grantId) {
       await api("POST", `/manage/grants/${grantId}/revoke`);
       toast("Access revoked");
       await refreshState();
-      location.hash = `#/characters/${charId}`;
+      location.hash = backHref;
     } catch (err) {
       revoke.disabled = false;
       toast(err.message, true);
@@ -669,18 +938,42 @@ function parseRoute() {
   return { section, parts };
 }
 
+// renderView re-renders the current route. Re-rendering replaces the DOM, so
+// a focused input that carries an id (e.g. a search box) gets its focus and
+// caret back after the swap.
 function renderView() {
   if (!lastState) return;
+  const active = document.activeElement;
+  const keep = active && active.id && viewEl.contains(active)
+    ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null;
+
+  renderRoute();
+
+  if (keep) {
+    const next = document.getElementById(keep.id);
+    if (next && next !== document.activeElement) {
+      next.focus();
+      try { next.setSelectionRange(keep.start, keep.end); } catch (_) { /* not a text input */ }
+    }
+  }
+}
+
+function renderRoute() {
   const { section, parts } = parseRoute();
   suppressAutoRender = false;
 
-  if (section === "characters" && parts.length >= 4 && parts[2] === "grants") {
+  const nested = section === "characters" || section === "applications";
+  if (nested && parts.length >= 4 && parts[2] === "grants") {
     suppressAutoRender = true; // scope editor manages its own state
-    renderGrantScopes(Number(parts[1]), Number(parts[3]));
+    renderGrantScopes({ kind: section, id: Number(parts[1]) }, Number(parts[3]));
     return;
   }
   if (section === "characters" && parts.length >= 2) {
     renderCharacterDetail(Number(parts[1]));
+    return;
+  }
+  if (section === "applications" && parts.length >= 2) {
+    renderApplicationDetail(Number(parts[1]));
     return;
   }
   viewEl.replaceChildren(TOP_VIEWS[section]());
