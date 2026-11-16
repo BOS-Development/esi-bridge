@@ -32,6 +32,15 @@ Proxies all Eve Online ESI connections, allowing applications to access characte
 
 esi-proxy is a single Go binary with a desktop app window (backed by a small background tray/menu-bar presence) — no separate services to run.
 
+### Installing a release
+
+Every push to `main` publishes installers on the [Releases](https://github.com/BOS-Development/esi-proxy/releases) page, built with the project's EVE SSO Client ID:
+
+* **Windows** — `esi-proxy-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-proxy`.
+* **macOS** — `esi-proxy-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Proxy** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
+
+To build the installers yourself, put the Client ID in `.clientid` (see below) and run `.\scripts\package-windows.ps1 -Version 1.0.0` (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)) or `./scripts/package-macos.sh 1.0.0`. Output goes to `dist/`.
+
 ### 1. (Optional) Register your own EVE SSO application
 
 esi-proxy ships with a built-in EVE SSO application, so you can skip this step. If you'd rather log in through an application you control, go to [developers.eveonline.com](https://developers.eveonline.com) and create one:
@@ -127,6 +136,8 @@ By default the proxy binds to `localhost`, so only applications **on the same ma
 ./esi-proxy export --out=bundle.enc     # prompts for a passphrase
 ./esi-proxy import --in=bundle.enc      # on the other machine, same passphrase
 ```
+
+On an installed Windows copy, run these with `esi-proxy-cli.exe` from the install folder (`%LOCALAPPDATA%\Programs\ESI Proxy`). The main `esi-proxy.exe` there is built without a console, so it can't prompt for a passphrase.
 
 ### Running tests
 
