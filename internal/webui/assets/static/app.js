@@ -398,7 +398,40 @@ function viewSettings() {
     }
   });
 
+  // Developer options: only in development builds (the default;
+  // release builds use -tags release). The server
+  // doesn't even route these endpoints in release builds.
+  if (s.dev_build) inner.appendChild(devSettings());
+
   return inner;
+}
+
+function devSettings() {
+  const box = el("div", "dev-settings");
+  box.appendChild(el("h2", "dev-settings-title", "Developer"));
+  box.appendChild(el("p", "hint", "These options appear only in development builds."));
+
+  const notifyBox = el("div", "setting");
+  notifyBox.appendChild(el("label", "setting-label", "Desktop notifications"));
+  notifyBox.appendChild(el("p", "hint",
+    "Send a sample OS notification to check that notifications show up on this machine."));
+  const notifyBtn = el("button", "btn", "Send test notification");
+  notifyBox.appendChild(notifyBtn);
+  box.appendChild(notifyBox);
+
+  notifyBtn.addEventListener("click", async () => {
+    notifyBtn.disabled = true;
+    try {
+      await api("POST", "/manage/dev/test-notification");
+      toast("Test notification sent");
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      notifyBtn.disabled = false;
+    }
+  });
+
+  return box;
 }
 
 const TOP_VIEWS = {

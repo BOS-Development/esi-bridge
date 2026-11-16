@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 	"github.com/BOS-Development/esi-proxy/internal/cache"
 	"github.com/BOS-Development/esi-proxy/internal/config"
 	"github.com/BOS-Development/esi-proxy/internal/esi"
@@ -212,6 +213,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /manage/client-id", s.requireSession(s.handleManageSetClientID))
 	mux.HandleFunc("POST /manage/custom-client-id", s.requireSession(s.handleManageSetUseCustomClientID))
 	mux.HandleFunc("POST /manage/bind-host", s.requireSession(s.handleManageSetBindHost))
+
+	// Developer-only endpoints, compiled in for every build but only routed
+	// in development builds (the default; not -tags release). See dev.go.
+	if buildinfo.Dev {
+		mux.HandleFunc("POST /manage/dev/test-notification", s.requireSession(s.handleManageDevTestNotification))
+	}
 	return mux
 }
 

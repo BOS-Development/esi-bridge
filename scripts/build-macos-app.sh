@@ -43,7 +43,14 @@ else
 	echo "warning: no .clientid file; building without a bundled Client ID (users must set a custom one)" >&2
 fi
 
-go build -ldflags "${LDFLAGS}" -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
+# Builds a development build by default, which adds developer-only options to
+# the Settings tab. RELEASE=1 makes a production release (-tags release).
+TAGS_ARG=""
+if [[ "${RELEASE:-}" == "1" ]]; then
+	TAGS_ARG="-tags=release"
+fi
+
+go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
 
 cat > "$APP_DIR/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>

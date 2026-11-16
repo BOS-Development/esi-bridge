@@ -78,6 +78,8 @@ open "ESI Proxy.app"
 
 The Windows and Linux scripts are thin wrappers around `go build -o esi-proxy[.exe] ./cmd/esi-proxy` — feel free to invoke that directly instead.
 
+Builds are **development builds** by default: they add a **Developer** section to the Settings tab, which can send a test desktop notification. For a **production release**, add the `release` build tag (`go build -tags release ./cmd/esi-proxy`, or `-Release` / `RELEASE=1` with the scripts), which leaves the Developer section out.
+
 The **ESI Proxy** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Proxy** in that menu re-opens it). If you registered your own application in step 1, open **Settings**, tick **Use a custom EVE SSO Client ID**, and paste its Client ID — it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
 
 The management UI is served over a loopback-only HTTP endpoint, so it also remains reachable in a browser at `http://localhost:8085/app` if you prefer that.

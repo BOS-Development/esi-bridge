@@ -4,14 +4,23 @@
 # the app window embeds the native WebView2 webview. The WebView2 runtime
 # (preinstalled on current Windows 10/11) must be present at run time.
 #
+# Builds a development build by default, which adds developer-only options to
+# the Settings tab. Pass -Release for a production release (-tags release).
+#
 # The bundled EVE SSO Client ID is read from a .clientid file at the repo
 # root (gitignored). Without it the build has no bundled Client ID and users
 # must register their own application.
+param([switch]$Release)
+
 $ErrorActionPreference = "Stop"
 
 Set-Location (Join-Path $PSScriptRoot "..")
 
 $buildArgs = @("build")
+if ($Release) {
+	$buildArgs += @("-tags", "release")
+}
+
 if (Test-Path ".clientid") {
 	$clientID = (Get-Content -Raw ".clientid") -replace '\s', ''
 	if ($clientID -notmatch '^[A-Za-z0-9]+$') {
@@ -30,4 +39,8 @@ if ($LASTEXITCODE -ne 0) {
 	throw "go build failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "Built esi-proxy.exe"
+if ($Release) {
+	Write-Host "Built esi-proxy.exe (release build)"
+} else {
+	Write-Host "Built esi-proxy.exe (development build)"
+}

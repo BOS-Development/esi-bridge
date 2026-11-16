@@ -150,6 +150,9 @@ type manageState struct {
 	ActiveGrants       []manageGrant             `json:"active_grants"`
 	PendingPermissions []managePendingPermission `json:"pending_permissions"`
 	AppPermissions     []manageAppPermission     `json:"app_permissions"`
+	// DevBuild is true in development builds (the default; not -tags release); the UI shows its
+	// developer-only Settings options only then.
+	DevBuild bool `json:"dev_build"`
 }
 
 func (s *Server) handleManageState(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +259,7 @@ func (s *Server) handleManageState(w http.ResponseWriter, r *http.Request) {
 		ActiveGrants:       outGrants,
 		PendingPermissions: outPendingPerms,
 		AppPermissions:     outAppPerms,
+		DevBuild:           buildinfo.Dev,
 	})
 }
 

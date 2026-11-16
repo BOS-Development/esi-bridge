@@ -6,12 +6,20 @@
 # packages first, e.g. on Debian/Ubuntu:
 #   sudo apt install build-essential libgtk-3-dev libwebkit2gtk-4.1-dev
 #
+# Builds a development build by default, which adds developer-only options to
+# the Settings tab. Set RELEASE=1 for a production release (-tags release).
+#
 # The bundled EVE SSO Client ID is read from a .clientid file at the repo
 # root (gitignored). Without it the build has no bundled Client ID and users
 # must register their own application.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+TAGS=()
+if [[ "${RELEASE:-}" == "1" ]]; then
+	TAGS=(-tags release)
+fi
 
 LDFLAGS=""
 if [[ -f .clientid ]]; then
@@ -25,6 +33,10 @@ else
 	echo "warning: no .clientid file; building without a bundled Client ID (users must set a custom one)" >&2
 fi
 
-CGO_ENABLED=1 go build -ldflags "$LDFLAGS" -o esi-proxy ./cmd/esi-proxy
+CGO_ENABLED=1 go build "${TAGS[@]}" -ldflags "$LDFLAGS" -o esi-proxy ./cmd/esi-proxy
 
-echo "Built esi-proxy"
+if [[ "${RELEASE:-}" == "1" ]]; then
+	echo "Built esi-proxy (release build)"
+else
+	echo "Built esi-proxy (development build)"
+fi
