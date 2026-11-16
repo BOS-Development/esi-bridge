@@ -50,7 +50,30 @@ if [[ "${RELEASE:-}" == "1" ]]; then
 	TAGS_ARG="-tags=release"
 fi
 
-go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$APP_DIR/Contents/MacOS/esi-proxy" ./cmd/esi-proxy
+# VERSION sets the bundle version shown in Finder (default 1.0).
+VERSION="${VERSION:-1.0}"
+if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+	echo "error: VERSION must be numeric, e.g. 1.0.42 (got '$VERSION')" >&2
+	exit 1
+fi
+
+# Oldest macOS the binary supports; keeps Intel and Apple Silicon builds in step.
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
+
+BIN="$APP_DIR/Contents/MacOS/esi-proxy"
+if [[ "${UNIVERSAL:-}" == "1" ]]; then
+	# UNIVERSAL=1 builds a fat binary that runs natively on both Apple Silicon
+	# and Intel Macs. cgo is off by default when cross-compiling, so it's
+	# forced on; Apple's clang targets either arch via the -arch flag Go passes.
+	for arch in arm64 amd64; do
+		CGO_ENABLED=1 GOOS=darwin GOARCH="$arch" \
+			go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$BIN-$arch" ./cmd/esi-proxy
+	done
+	lipo -create -output "$BIN" "$BIN-arm64" "$BIN-amd64"
+	rm -f "$BIN-arm64" "$BIN-amd64"
+else
+	go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$BIN" ./cmd/esi-proxy
+fi
 
 cat > "$APP_DIR/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -66,7 +89,11 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>${VERSION}</string>
+	<key>CFBundleVersion</key>
+	<string>${VERSION}</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>${MACOSX_DEPLOYMENT_TARGET}</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>CFBundleURLTypes</key>
@@ -83,6 +110,12 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
 </dict>
 </plist>
 PLIST
+
+# Ad-hoc sign the whole bundle so its signature covers Info.plist (Apple
+# Silicon refuses to run unsigned code, and a bundle whose binary was signed
+# before Info.plist existed reads as damaged). This is not a Developer ID
+# signature: downloaded copies still need Gatekeeper's "Open Anyway" once.
+codesign --force --deep --sign - "$APP_DIR"
 
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 "$LSREGISTER" -f "$PWD/$APP_DIR"
