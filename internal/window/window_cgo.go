@@ -5,6 +5,7 @@ package window
 import (
 	"runtime"
 
+	"github.com/BOS-Development/esi-proxy/internal/browser"
 	webview "github.com/webview/webview_go"
 )
 
@@ -35,6 +36,12 @@ func Open(title, url string) error {
 	w.SetTitle(title)
 	// A sensible default first size; the window stays user-resizable.
 	w.SetSize(1024, 720, webview.HintNone)
+	// window.open inside the webview stays in-app (or is dropped), but EVE
+	// SSO must run in the user's real browser. Expose openExternal to the
+	// page so it can hand URLs off to the default browser.
+	if err := w.Bind("openExternal", browser.Open); err != nil {
+		return err
+	}
 	w.Navigate(url)
 	w.Run() // blocks until the window is closed
 	return nil

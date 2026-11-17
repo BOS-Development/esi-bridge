@@ -1019,9 +1019,14 @@ async function refreshState() {
 document.getElementById("add-character").addEventListener("click", async () => {
   try {
     const { login_url } = await api("POST", "/manage/characters/add");
-    // SSO must complete in a real browser (custom-scheme callback), so open a
-    // new tab/window rather than navigating this page.
-    window.open(login_url, "_blank", "noopener");
+    // SSO must complete in the user's real browser. In the native app window
+    // the webview exposes openExternal for that; in a plain browser tab, open
+    // a new tab rather than navigating this page.
+    if (typeof window.openExternal === "function") {
+      await window.openExternal(login_url);
+    } else {
+      window.open(login_url, "_blank", "noopener");
+    }
     toast("Opening EVE SSO login…");
   } catch (err) {
     toast(err.message, true);

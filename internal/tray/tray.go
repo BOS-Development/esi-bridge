@@ -15,6 +15,7 @@ import (
 
 	"fyne.io/systray"
 
+	"github.com/BOS-Development/esi-proxy/internal/browser"
 	"github.com/BOS-Development/esi-proxy/internal/notify"
 	"github.com/BOS-Development/esi-proxy/internal/server"
 	"github.com/BOS-Development/esi-proxy/internal/store"
@@ -216,7 +217,7 @@ func (t *Tray) onAddCharacter() {
 		t.log.Error("begin login", "error", err)
 		return
 	}
-	if err := openBrowser(url); err != nil {
+	if err := browser.Open(url); err != nil {
 		t.log.Error("open browser for login", "error", err, "url", url)
 	}
 }

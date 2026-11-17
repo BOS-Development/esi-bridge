@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
 	"sync"
 	"time"
 
+	"github.com/BOS-Development/esi-proxy/internal/browser"
 	"github.com/BOS-Development/esi-proxy/internal/window"
 )
 
@@ -63,7 +63,7 @@ func (l *windowLauncher) Open() {
 	appURL := fmt.Sprintf("http://localhost:%d/app", l.port)
 
 	if !window.Supported {
-		if err := openBrowser(appURL); err != nil {
+		if err := browser.Open(appURL); err != nil {
 			l.log.Error("open management UI in browser", "error", err)
 		}
 		return
@@ -134,22 +134,4 @@ func (l *windowLauncher) waitReady() {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-}
-
-// openBrowser opens url in the user's default browser — the fallback surface
-// when no native window is available.
-func openBrowser(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
-	}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("open browser: %w", err)
-	}
-	return nil
 }
