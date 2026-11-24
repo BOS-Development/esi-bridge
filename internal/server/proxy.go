@@ -33,8 +33,12 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := s.store.GetActiveGrant(app.ID, characterID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			_ = s.store.UpsertPendingGrant(app.ID, characterID, nil)
-			http.Error(w, "access to this character has not been approved yet; call /api/request-access or check the tray", http.StatusForbidden)
+			if err := s.store.EnsurePendingGrant(app.ID, characterID); err != nil {
+				// Typically an unknown character_id (foreign key). The caller
+				// still gets the 403 below; this is only the courtesy request.
+				s.log.Warn("record pending grant from proxy miss", "application_id", app.ID, "character_id", characterID, "error", err)
+			}
+			http.Error(w, "access to this character has not been approved yet; call /api/request-access and approve it in the ESI Bridge window", http.StatusForbidden)
 			return
 		}
 		s.log.Error("get active grant", "error", err)

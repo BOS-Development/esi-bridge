@@ -271,6 +271,20 @@ func (s *Store) UpsertPendingGrant(applicationID, characterID int64, scopes []st
 	return err
 }
 
+// EnsurePendingGrant records that an application wants access to a
+// character without saying which scopes, creating a pending_grants row only
+// if none exists. Unlike UpsertPendingGrant it never overwrites the scopes
+// of an existing request, so an app probing /proxy before approval can't
+// wipe out the scope list it sent to /api/request-access.
+func (s *Store) EnsurePendingGrant(applicationID, characterID int64) error {
+	_, err := s.db.Exec(`
+		INSERT INTO pending_grants (application_id, character_id, requested_scopes, requested_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(application_id, character_id) DO NOTHING
+	`, applicationID, characterID, joinScopes(nil), now())
+	return err
+}
+
 func (s *Store) ListPendingGrants() ([]PendingGrant, error) {
 	rows, err := s.db.Query(`
 		SELECT pg.id, pg.application_id, a.name, pg.character_id, c.name, pg.requested_scopes, pg.requested_at

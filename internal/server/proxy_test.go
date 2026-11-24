@@ -155,6 +155,10 @@ func TestApprovalAndProxyFlow(t *testing.T) {
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("ListPendingGrants: got %d, err %v", len(pending), err)
 	}
+	// The 403'd proxy call must not have wiped the scopes request-access asked for.
+	if got := pending[0].RequestedScopes; len(got) != 1 || got[0] != "esi-assets.read_assets.v1" {
+		t.Fatalf("pending grant scopes after proxy miss = %v, want [esi-assets.read_assets.v1]", got)
+	}
 	if err := st.ApprovePendingGrant(pending[0].ID); err != nil {
 		t.Fatalf("ApprovePendingGrant: %v", err)
 	}
