@@ -50,12 +50,12 @@ type registerAppResponse struct {
 
 // handleRegisterApp lets an external application self-register with a
 // name it specifies itself. The returned api_key has no grants until the
-// user approves an access request for a specific character via the tray.
+// user approves an access request for a specific character in the window.
 //
 // Names are not required to be unique: identity is the api_key, not the
 // name, so two registrations (e.g. two installs of the same app, or a
 // re-register after a lost key) can share a name without conflict — the
-// tray shows each as a separate entry to approve/deny independently.
+// window shows each as a separate entry to approve/deny independently.
 func (s *Server) handleRegisterApp(w http.ResponseWriter, r *http.Request) {
 	var req registerAppRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
@@ -93,7 +93,7 @@ type requestAccessResponse struct {
 // handleRequestAccess is called by an application to ask for access to a
 // character. If a covering grant already exists it's reported immediately;
 // otherwise a pending_grants row is created for the user to approve/deny
-// from the tray.
+// in the window.
 func (s *Server) handleRequestAccess(w http.ResponseWriter, r *http.Request) {
 	app, err := s.authenticateApp(r)
 	if err != nil {

@@ -43,7 +43,7 @@ func (s *Store) GetAccount(id int64) (Account, error) {
 }
 
 // DefaultAccountName is the account newly-logged-in characters are grouped
-// under when no other account management UI is in play (v1's tray doesn't
+// under when no other account management UI is in play (the UI doesn't yet
 // expose creating/renaming accounts; the schema supports it for later).
 const DefaultAccountName = "Main"
 
@@ -403,7 +403,7 @@ func (s *Store) ListActiveGrants() ([]Grant, error) {
 }
 
 // ListActiveGrantsView returns active grants joined with application and
-// character names, for display (e.g. in the tray menu).
+// character names, for display (e.g. in the management UI).
 func (s *Store) ListActiveGrantsView() ([]GrantView, error) {
 	rows, err := s.db.Query(`
 		SELECT g.id, g.application_id, a.name, g.character_id, c.name, g.scopes, g.approved_at

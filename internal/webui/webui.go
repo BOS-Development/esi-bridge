@@ -1,6 +1,6 @@
 // Package webui holds the embedded assets for the proxy's full management UI
-// (the window/browser surface that replaces the old tray approval menus). The
-// server package serves these behind its loopback + session-token guards.
+// (the app window, or a browser in serve-ui dev mode). The server package
+// serves these behind its loopback + session-token guards.
 package webui
 
 import (

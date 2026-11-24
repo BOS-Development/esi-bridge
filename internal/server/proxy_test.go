@@ -114,7 +114,7 @@ func registerApp(t *testing.T, ts *httptest.Server, name string) (appID int64, a
 
 // TestApprovalAndProxyFlow exercises the full README flow end to end:
 // an app registers, requests access, the user approves it (simulated here
-// the same way the tray does — via store.ApprovePendingGrant), and the app
+// directly via store.ApprovePendingGrant, as the window's approve action does), and the app
 // can then use the proxy, with a second identical request served from
 // cache instead of hitting ESI again.
 func TestApprovalAndProxyFlow(t *testing.T) {

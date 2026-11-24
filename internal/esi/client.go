@@ -45,7 +45,7 @@ func (c *Client) Forward(ctx context.Context, accessToken, method, path, rawQuer
 		return nil, fmt.Errorf("build esi request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("User-Agent", "esi-proxy (github.com/BOS-Development/esi-proxy)")
+	req.Header.Set("User-Agent", "ESI-Bridge (+https://github.com/BOS-Development/esi-proxy)")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

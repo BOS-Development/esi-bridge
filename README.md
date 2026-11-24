@@ -130,7 +130,7 @@ An app discovers the proxy by browsing for `_esi-proxy._tcp` and reading `base_u
 
 #### Letting other machines connect (LAN access)
 
-By default the proxy binds to `localhost`, so only applications **on the same machine** can connect — the token-holding proxy stays off the network. To let other machines on your LAN connect to a proxy they discover, enable **Allow LAN Access** in the tray menu. This binds to all interfaces and advertises your machine's LAN IP (e.g. `http://192.168.1.20:8085`) in `base_url` instead of `localhost`, falling back to `hostname.local` if no LAN address is found.
+By default the proxy binds to `localhost`, so only applications **on the same machine** can connect — the token-holding proxy stays off the network. To let other machines on your LAN connect to a proxy they discover, enable **Allow LAN access** under **Settings**. This binds to all interfaces and advertises your machine's LAN IP (e.g. `http://192.168.1.20:8085`) in `base_url` instead of `localhost`, falling back to `hostname.local` if no LAN address is found.
 
 **Toggling LAN access takes effect immediately** — no restart. The listener is rebound and the mDNS advert re-registered on the spot; turning it off also disconnects machines already connected over the LAN (in-flight requests get a few seconds to finish). While LAN access is on, the proxy re-checks its LAN IP every 30 seconds and updates the advert if it changes (e.g. after a DHCP renewal or switching networks). You can also set it directly in `config.json` via `"bind_host"`: `"localhost"` (default, same-machine only), `"0.0.0.0"` (all interfaces), or a specific interface IP — edits there are picked up on the next start.
 

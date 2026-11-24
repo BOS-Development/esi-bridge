@@ -63,7 +63,7 @@ func (s *SSO) Refresh(ctx context.Context, refreshToken string) (*oauth2.Token, 
 }
 
 // SSOHolder makes the active *SSO swappable at runtime — set from the
-// tray/HTTP setup form when the user enters their EVE client_id, without
+// management UI when the user enters their EVE client_id, without
 // requiring a process restart. Server and tokens.Manager both hold a
 // pointer to the same Holder rather than a fixed *SSO, and call Get() at
 // each use rather than caching the value.

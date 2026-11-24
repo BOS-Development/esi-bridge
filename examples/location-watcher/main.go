@@ -4,7 +4,7 @@
 //
 //  1. detect that the proxy is running (GET /healthz);
 //  2. register itself and request the list_characters permission, waiting for
-//     the user to approve it from the proxy's tray/window;
+//     the user to approve it from the ESI Bridge window;
 //  3. list the characters and let the user pick one;
 //  4. request that character's location and ship-type scopes, again waiting
 //     for approval;
@@ -90,7 +90,7 @@ func run(ctx context.Context, proxyURL, appName string, pollInterval time.Durati
 		return fmt.Errorf("list characters: %w", err)
 	}
 	if len(chars) == 0 {
-		return fmt.Errorf("the proxy has no characters yet — add one from its tray/window first")
+		return fmt.Errorf("the proxy has no characters yet — add one from the ESI Bridge window first")
 	}
 	char, err := chooseCharacter(ctx, chars)
 	if err != nil {
@@ -146,7 +146,7 @@ func ensurePermission(ctx context.Context, c *Client, pollInterval time.Duration
 		return nil
 	}
 
-	fmt.Printf("Waiting for you to approve the %q permission in the proxy's tray/window ...\n", perm)
+	fmt.Printf("Waiting for you to approve the %q permission in the ESI Bridge window ...\n", perm)
 	for {
 		if err := sleep(ctx, pollInterval); err != nil {
 			return err
@@ -173,7 +173,7 @@ func ensureAccess(ctx context.Context, c *Client, pollInterval time.Duration, ch
 		return nil
 	}
 
-	fmt.Printf("Waiting for you to approve access to %s in the proxy's tray/window ...\n", char.Name)
+	fmt.Printf("Waiting for you to approve access to %s in the ESI Bridge window ...\n", char.Name)
 	for {
 		if err := sleep(ctx, pollInterval); err != nil {
 			return err

@@ -14,7 +14,7 @@ type requestPermissionsRequest struct {
 // handleRequestPermissions lets an application ask for app-wide (not
 // per-character) permissions such as listing every character on the proxy.
 // Each requested permission is reported back as already "granted" or newly
-// "pending" (awaiting approval from the tray), the same shape as
+// "pending" (awaiting approval in the window), the same shape as
 // /api/request-access uses for character grants.
 func (s *Server) handleRequestPermissions(w http.ResponseWriter, r *http.Request) {
 	app, err := s.authenticateApp(r)

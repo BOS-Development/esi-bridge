@@ -12,7 +12,7 @@ third-party app couldn't either.)
 1. **Detects the proxy** by calling `GET /healthz`.
 2. **Registers** itself (`POST /api/register`) and **requests the
    `list_characters` permission** (`POST /api/request-permissions`), then waits
-   for you to approve it from the proxy's tray/window.
+   for you to approve it in the ESI Bridge window.
 3. **Lists the characters** (`GET /api/characters`) and lets you pick one.
 4. **Requests that character's location and ship scopes**
    (`POST /api/request-access`) and waits for approval.
@@ -51,8 +51,7 @@ Or just `go run ./examples/location-watcher`.
 | `-poll`  | `2s`                    | How often to re-check for your approval while waiting. |
 | `-reset` | `false`                 | Forget the saved api_key for this proxy and re-register. |
 
-When prompted, approve the permission and access requests from the proxy's
-tray menu (**Permission Requests** / **Pending Approvals**) or its management
+When prompted, approve the permission and access requests in the ESI Bridge
 window.
 
 ## Example session

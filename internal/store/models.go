@@ -54,7 +54,7 @@ type GrantView struct {
 }
 
 // PendingGrant is a grant request awaiting user approval, joined with the
-// application and character names for display (e.g. in the tray menu).
+// application and character names for display (e.g. in the management UI).
 type PendingGrant struct {
 	ID              int64
 	ApplicationID   int64

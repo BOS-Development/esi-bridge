@@ -1,6 +1,6 @@
 // Command esi-proxy (ESI Bridge) runs a local proxy for EVE Online's ESI API: it holds
 // character SSO tokens, caches ESI responses, and gates external
-// applications behind a tray-based approval flow. See README.md.
+// applications behind a user approval flow. See README.md.
 package main
 
 import (
@@ -200,7 +200,7 @@ func run(log *slog.Logger) error {
 		Quit:           quit,
 		OnAvailable: func(r update.Release) {
 			notify.Send(log, "ESI Bridge update available",
-				fmt.Sprintf("Version %s is out. Install it from the tray menu or Settings.", r.Version))
+				fmt.Sprintf("Version %s is out. Install it from Settings or the tray menu.", r.Version))
 		},
 		OnInstallFailed: func(err error) {
 			notify.Send(log, "ESI Bridge update failed", err.Error())
