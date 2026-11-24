@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds ESI Proxy.app — required on macOS for eveauth-proxy:// login to
+# Builds ESI Bridge.app — required on macOS for eveauth-proxy:// login to
 # work at all: Launch Services can only route a custom URL scheme to a
 # proper .app bundle (CFBundleURLTypes in Info.plist), never to a bare
 # binary. `go build -o esi-proxy ./cmd/esi-proxy && ./esi-proxy` still runs
@@ -9,12 +9,24 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-APP_NAME="ESI Proxy"
+APP_NAME="ESI Bridge"
 APP_DIR="${APP_NAME}.app"
 BUNDLE_ID="dev.bos-development.esi-proxy"
 
 rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR/Contents/MacOS"
+mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+
+# App icon, from the same image the tray and UI use. sips scales it to each
+# size an .icns needs and iconutil packs the set.
+ICONSET="$(mktemp -d)/AppIcon.iconset"
+mkdir -p "$ICONSET"
+for size in 16 32 128 256 512; do
+	sips -z "$size" "$size" internal/assets/bridge.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+	double=$((size * 2))
+	sips -z "$double" "$double" internal/assets/bridge.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
+rm -rf "$(dirname "$ICONSET")"
 
 # Both this binary's internal/urlscheme package and fyne.io/systray compile
 # Objective-C and link Cocoa, so Go's linker appends -lobjc once per package.
@@ -90,6 +102,8 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
 	<string>${APP_NAME}</string>
 	<key>CFBundleIdentifier</key>
 	<string>${BUNDLE_ID}</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
 	<string>esi-proxy</string>
 	<key>CFBundlePackageType</key>

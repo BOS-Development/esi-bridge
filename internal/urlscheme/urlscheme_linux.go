@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-// register writes a .desktop file declaring esi-proxy as the handler for
+// register writes a .desktop file declaring ESI Bridge as the handler for
 // x-scheme-handler/eveauth-proxy and points xdg-mime at it, so Linux routes
 // eveauth-proxy:// URLs to this executable, spawning a new process with the
 // URL as argv[1] (handled by the forwarder-mode branch in cmd/esi-proxy).
@@ -32,7 +32,7 @@ func register() error {
 	const desktopFileName = "esi-proxy.desktop"
 	content := fmt.Sprintf(`[Desktop Entry]
 Type=Application
-Name=ESI Proxy
+Name=ESI Bridge
 Exec=%s %%u
 StartupNotify=false
 NoDisplay=true

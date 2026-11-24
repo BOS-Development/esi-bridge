@@ -1,7 +1,7 @@
-# location-watcher — example esi-proxy client
+# location-watcher — example ESI Bridge client
 
 A small, self-contained example of an **external application** talking to a
-running [esi-proxy](../../README.md). It shows the full flow a real app goes
+running [ESI Bridge](../../README.md). It shows the full flow a real app goes
 through — discovery, registration, approval, and reading ESI through the
 proxy — in nothing but Go's standard library and the proxy's public HTTP API.
 (It deliberately imports none of the proxy's `internal/` packages, since a
@@ -58,7 +58,7 @@ window.
 ## Example session
 
 ```
-Looking for esi-proxy at http://localhost:8085 ... found.
+Looking for ESI Bridge at http://localhost:8085 ... found.
 Waiting for you to approve the "list_characters" permission ...
 Permission "list_characters" granted.
 

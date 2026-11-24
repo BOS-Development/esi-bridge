@@ -12,7 +12,7 @@ import (
 )
 
 // bundlePath returns the .app bundle the running binary lives in
-// (…/ESI Proxy.app/Contents/MacOS/esi-proxy → …/ESI Proxy.app).
+// (…/ESI Bridge.app/Contents/MacOS/esi-proxy → …/ESI Bridge.app).
 func bundlePath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -33,16 +33,16 @@ func bundlePath() (string, error) {
 func canSelfInstall() (bool, string) {
 	bundle, err := bundlePath()
 	if err != nil {
-		return false, "ESI Proxy isn't running from an app bundle, so it can't update itself. Download the new version from the release page."
+		return false, "ESI Bridge isn't running from an app bundle, so it can't update itself. Download the new version from the release page."
 	}
 	if strings.Contains(bundle, "/AppTranslocation/") || strings.HasPrefix(bundle, "/Volumes/") {
-		return false, "ESI Proxy is running from the disk image or a temporary location. Drag it into Applications first, then it can update itself."
+		return false, "ESI Bridge is running from the disk image or a temporary location. Drag it into Applications first, then it can update itself."
 	}
 	// Swapping the bundle means renaming it, which needs write access to
 	// the folder it's in.
 	probe, err := os.CreateTemp(filepath.Dir(bundle), ".esi-proxy-update-probe-*")
 	if err != nil {
-		return false, "ESI Proxy can't write to " + filepath.Dir(bundle) + ", so it can't update itself. Download the new version from the release page."
+		return false, "ESI Bridge can't write to " + filepath.Dir(bundle) + ", so it can't update itself. Download the new version from the release page."
 	}
 	probe.Close()
 	os.Remove(probe.Name())

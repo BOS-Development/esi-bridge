@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the esi-proxy binary for Linux.
+# Builds the ESI Bridge binary (esi-proxy) for Linux.
 #
 # Requires a C toolchain (CGO): the app window embeds the native WebKitGTK
 # webview and the menu-bar/tray presence is native too. Install the dev

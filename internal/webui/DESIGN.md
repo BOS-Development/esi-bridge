@@ -1,4 +1,4 @@
-# ESI Proxy UI — design context
+# ESI Bridge UI — design context
 
 Design standards for the proxy's management UI (`internal/webui`). Read this
 before changing `assets/index.html` or `assets/static/app.css`. The UI is a

@@ -24,7 +24,7 @@ import (
 //
 //	esi-proxy mdns announce   send the service announcement (and keep answering
 //	                          queries) for --duration, then withdraw it
-//	esi-proxy mdns browse     listen for esi-proxy services on the network for
+//	esi-proxy mdns browse     listen for ESI Bridge services on the network for
 //	                          --duration and print what's found
 //
 // announce defaults the port and base_url to the saved config, so it mirrors
@@ -39,7 +39,7 @@ func runMDNS(args []string) error {
 		fmt.Fprint(os.Stderr, `usage: esi-proxy mdns <announce|browse> [flags]
 
   announce   send the mDNS announcement and answer queries
-  browse     discover esi-proxy services on the local network
+  browse     discover ESI Bridge services on the local network
 
 flags:
 `)

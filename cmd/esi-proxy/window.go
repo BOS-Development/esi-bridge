@@ -29,7 +29,7 @@ func runWindow(args []string) error {
 	if *url == "" {
 		return errors.New("--window requires --url")
 	}
-	return window.Open("ESI Proxy", *url)
+	return window.Open("ESI Bridge", *url)
 }
 
 // windowLauncher opens and tracks the management window child process on

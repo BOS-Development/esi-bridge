@@ -46,15 +46,15 @@ func register() error {
 // bundlePathFor walks up from an executable path looking for the
 // Contents/MacOS layout of an .app bundle, returning the bundle root.
 func bundlePathFor(exe string) (string, bool) {
-	macOSDir := filepath.Dir(exe) // .../ESI Proxy.app/Contents/MacOS
+	macOSDir := filepath.Dir(exe) // .../ESI Bridge.app/Contents/MacOS
 	if filepath.Base(macOSDir) != "MacOS" {
 		return "", false
 	}
-	contentsDir := filepath.Dir(macOSDir) // .../ESI Proxy.app/Contents
+	contentsDir := filepath.Dir(macOSDir) // .../ESI Bridge.app/Contents
 	if filepath.Base(contentsDir) != "Contents" {
 		return "", false
 	}
-	bundle := filepath.Dir(contentsDir) // .../ESI Proxy.app
+	bundle := filepath.Dir(contentsDir) // .../ESI Bridge.app
 	if !strings.HasSuffix(bundle, ".app") {
 		return "", false
 	}

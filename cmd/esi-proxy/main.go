@@ -1,4 +1,4 @@
-// Command esi-proxy runs a local proxy for EVE Online's ESI API: it holds
+// Command esi-proxy (ESI Bridge) runs a local proxy for EVE Online's ESI API: it holds
 // character SSO tokens, caches ESI responses, and gates external
 // applications behind a tray-based approval flow. See README.md.
 package main
@@ -90,7 +90,7 @@ func main() {
 			printUsage()
 			return
 		case "-v", "--version", "version":
-			fmt.Println("esi-proxy", buildinfo.DisplayVersion())
+			fmt.Println("ESI Bridge", buildinfo.DisplayVersion())
 			return
 		}
 	}
@@ -102,14 +102,14 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`esi-proxy — local proxy for EVE Online's ESI API
+	fmt.Println(`ESI Bridge (esi-proxy) — local proxy for EVE Online's ESI API
 
 Usage:
   esi-proxy                                  run the proxy (tray + HTTP server)
   esi-proxy export --out=bundle.enc          export accounts/characters/tokens
   esi-proxy import --in=bundle.enc           import a bundle onto this machine
   esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
-  esi-proxy mdns browse   [--duration D]     debug: discover esi-proxy services on the LAN
+  esi-proxy mdns browse   [--duration D]     debug: discover ESI Bridge services on the LAN
   esi-proxy version                          print the version
   esi-proxy serve-ui                         dev: serve the management UI only (no tray), at /app
   esi-proxy --window --url URL               internal: host the management UI in a native
@@ -142,7 +142,7 @@ func forwardCallback(port int, rawURL string) error {
 	}
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/sso/callback?%s", port, u.RawQuery))
 	if err != nil {
-		return fmt.Errorf("forward to running instance on port %d (is esi-proxy running?): %w", port, err)
+		return fmt.Errorf("forward to running instance on port %d (is ESI Bridge running?): %w", port, err)
 	}
 	defer resp.Body.Close()
 	return nil
@@ -191,7 +191,7 @@ func run(log *slog.Logger) error {
 	ctx, quit := context.WithCancel(sigCtx)
 	defer quit()
 
-	log.Info("starting esi-proxy", "version", buildinfo.DisplayVersion())
+	log.Info("starting ESI Bridge", "version", buildinfo.DisplayVersion())
 
 	updater := update.New(update.Options{
 		CurrentVersion: buildinfo.Version,
@@ -199,11 +199,11 @@ func run(log *slog.Logger) error {
 		Log:            log,
 		Quit:           quit,
 		OnAvailable: func(r update.Release) {
-			notify.Send(log, "ESI Proxy update available",
+			notify.Send(log, "ESI Bridge update available",
 				fmt.Sprintf("Version %s is out. Install it from the tray menu or Settings.", r.Version))
 		},
 		OnInstallFailed: func(err error) {
-			notify.Send(log, "ESI Proxy update failed", err.Error())
+			notify.Send(log, "ESI Bridge update failed", err.Error())
 		},
 	})
 	srv.SetUpdater(updater)
@@ -226,7 +226,7 @@ func run(log *slog.Logger) error {
 	// The management UI lives in a native window hosted by a child process
 	// (see window.go / internal/window). Open it on launch so the app
 	// presents a window like any desktop app, and hand the tray the same
-	// launcher so "Open ESI Proxy" can re-open it after it's been closed. The
+	// launcher so "Open ESI Bridge" can re-open it after it's been closed. The
 	// loopback /app page stays reachable from a browser regardless.
 	winLauncher := newWindowLauncher(cfg.Port, log)
 	go winLauncher.Open()
@@ -313,7 +313,7 @@ func runServeUI(log *slog.Logger) error {
 		}
 	}()
 
-	fmt.Printf("ESI Proxy management UI (dev, no tray): http://%s/app\n", addr)
+	fmt.Printf("ESI Bridge management UI (dev, no tray): http://%s/app\n", addr)
 	fmt.Println("Press Ctrl-C to stop.")
 
 	<-ctx.Done()

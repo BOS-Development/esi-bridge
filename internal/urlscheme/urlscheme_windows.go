@@ -24,7 +24,7 @@ func register() error {
 		return fmt.Errorf("create protocol key: %w", err)
 	}
 	defer protoKey.Close()
-	if err := protoKey.SetStringValue("", "URL:ESI Proxy Auth Callback"); err != nil {
+	if err := protoKey.SetStringValue("", "URL:ESI Bridge Auth Callback"); err != nil {
 		return fmt.Errorf("set protocol description: %w", err)
 	}
 	if err := protoKey.SetStringValue("URL Protocol", ""); err != nil {

@@ -1,4 +1,4 @@
-; Inno Setup script for the ESI Proxy Windows installer.
+; Inno Setup script for the ESI Bridge Windows installer.
 ;
 ; Built by scripts/package-windows.ps1, which compiles the binaries first and
 ; passes these defines on the ISCC command line:
@@ -19,7 +19,7 @@
   #define OutputDir "."
 #endif
 
-#define AppName "ESI Proxy"
+#define AppName "ESI Bridge"
 #define AppExe "esi-proxy.exe"
 #define RepoRoot AddBackslash(SourcePath) + "..\.."
 
@@ -47,6 +47,7 @@ OutputBaseFilename=esi-proxy-{#AppVersion}-windows-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile={#RepoRoot}\internal\assets\bridge.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 ; The app lives in the tray, so an upgrade has to stop it first.
@@ -62,6 +63,13 @@ Source: "{#BuildDir}\esi-proxy.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BuildDir}\esi-proxy-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 
+[InstallDelete]
+; Shortcuts from before the rename to ESI Bridge; upgrades would otherwise
+; leave them behind next to the new ones.
+Type: files; Name: "{autoprograms}\ESI Proxy.lnk"
+Type: files; Name: "{autodesktop}\ESI Proxy.lnk"
+Type: files; Name: "{userstartup}\ESI Proxy.lnk"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
@@ -71,7 +79,7 @@ Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: startup
 ; The eveauth-proxy:// SSO callback handler. The app also (re)writes this on
 ; every start (internal/urlscheme), but registering it here means login works
 ; right after install and the key is removed on uninstall.
-Root: HKCU; Subkey: "Software\Classes\eveauth-proxy"; ValueType: string; ValueName: ""; ValueData: "URL:ESI Proxy Auth Callback"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\eveauth-proxy"; ValueType: string; ValueName: ""; ValueData: "URL:ESI Bridge Auth Callback"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\eveauth-proxy"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\eveauth-proxy\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
 

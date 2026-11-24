@@ -114,6 +114,6 @@ jobs:
           else
             gh release create "$tag" dist/* \
               --target "$GITHUB_SHA" \
-              --title "ESI Proxy ${VERSION}" \
+              --title "ESI Bridge ${VERSION}" \
               --generate-notes
           fi

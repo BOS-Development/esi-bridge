@@ -1,4 +1,4 @@
-# ESI Proxy
+# ESI Bridge
 
 Proxies all Eve Online ESI connections, allowing applications to access character lists and ESI endpoints without needing to be explicitly added.  
 
@@ -30,14 +30,14 @@ Proxies all Eve Online ESI connections, allowing applications to access characte
 
 ## Getting Started
 
-esi-proxy is a single Go binary with a desktop app window (backed by a small background tray/menu-bar presence) — no separate services to run.
+ESI Bridge is a single Go binary with a desktop app window (backed by a small background tray/menu-bar presence) — no separate services to run.
 
 ### Installing a release
 
 Every push to `main` publishes installers on the [Releases](https://github.com/BOS-Development/esi-proxy/releases) page, built with the project's EVE SSO Client ID:
 
 * **Windows** — `esi-proxy-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-proxy`.
-* **macOS** — `esi-proxy-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Proxy** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
+* **macOS** — `esi-proxy-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Bridge** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
 #### Updates
 
@@ -47,10 +47,10 @@ To build the installers yourself, put the Client ID in `.clientid` (see below) a
 
 ### 1. (Optional) Register your own EVE SSO application
 
-esi-proxy ships with a built-in EVE SSO application, so you can skip this step. If you'd rather log in through an application you control, go to [developers.eveonline.com](https://developers.eveonline.com) and create one:
+ESI Bridge ships with a built-in EVE SSO application, so you can skip this step. If you'd rather log in through an application you control, go to [developers.eveonline.com](https://developers.eveonline.com) and create one:
 
 * Connection Type: **Authentication & API Access**
-* Callback URL: `eveauth-proxy://callback` — a custom URL scheme, not an `http://` address (matches the convention other EVE community tools use, e.g. `eveauth-pyfa`). esi-proxy registers itself as this scheme's OS handler on every startup; see the platform notes below.
+* Callback URL: `eveauth-proxy://callback` — a custom URL scheme, not an `http://` address (matches the convention other EVE community tools use, e.g. `eveauth-pyfa`). ESI Bridge registers itself as this scheme's OS handler on every startup; see the platform notes below.
 * Scopes: whatever ESI scopes you want the proxy able to request on your characters' behalf (see `server.LoginScopes` in `internal/server/sso.go` for the defaults)
 
 Copy the generated **Client ID**. Characters are tied to the Client ID they were added with, so pick one before adding characters (switching later means re-adding them).
@@ -84,16 +84,18 @@ platform's native webview, and the tray/menu-bar presence is native too.
 
 ```sh
 ./scripts/build-macos-app.sh
-open "ESI Proxy.app"
+open "ESI Bridge.app"
 ```
 
 (`go build -o esi-proxy ./cmd/esi-proxy && ./esi-proxy` still works fine on macOS for everything *except* SSO login, which needs the bundle.)
 
 The Windows and Linux scripts are thin wrappers around `go build -o esi-proxy[.exe] ./cmd/esi-proxy` — feel free to invoke that directly instead.
 
+The app icon lives in `internal/assets/` (`bridge.ico`, `bridge.png`) and is embedded into the tray, notifications and UI. The Windows exe icon comes from the committed `cmd/esi-proxy/rsrc_windows_amd64.syso`; after changing `bridge.ico`, regenerate it with `scripts/gen-winres.sh` (needs `windres` from MinGW/MSYS2).
+
 Builds are **development builds** by default: they add a **Developer** section to the Settings tab, which can send a test desktop notification. For a **production release**, add the `release` build tag (`go build -tags release ./cmd/esi-proxy`, or `-Release` / `RELEASE=1` with the scripts), which leaves the Developer section out.
 
-The **ESI Proxy** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Proxy** in that menu re-opens it). If you registered your own application in step 1, open **Settings**, tick **Use a custom EVE SSO Client ID**, and paste its Client ID — it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Proxy?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
+The **ESI Bridge** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Bridge** in that menu re-opens it). If you registered your own application in step 1, open **Settings**, tick **Use a custom EVE SSO Client ID**, and paste its Client ID — it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Bridge?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
 
 The management UI is served over a loopback-only HTTP endpoint, so it also remains reachable in a browser at `http://localhost:8085/app` if you prefer that.
 
@@ -141,7 +143,7 @@ By default the proxy binds to `localhost`, so only applications **on the same ma
 ./esi-proxy import --in=bundle.enc      # on the other machine, same passphrase
 ```
 
-On an installed Windows copy, run these with `esi-proxy-cli.exe` from the install folder (`%LOCALAPPDATA%\Programs\ESI Proxy`). The main `esi-proxy.exe` there is built without a console, so it can't prompt for a passphrase.
+On an installed Windows copy, run these with `esi-proxy-cli.exe` from the install folder (`%LOCALAPPDATA%\Programs\ESI Bridge`). The main `esi-proxy.exe` there is built without a console, so it can't prompt for a passphrase.
 
 ### Running tests
 

@@ -1,0 +1,7 @@
+// Windows resources linked into esi-proxy.exe: the ESI Bridge icon.
+//
+// ID 32512 is IDI_APPLICATION, which the webview window loads from the
+// module for its title bar / taskbar icon; Explorer also shows it as the exe
+// icon. Regenerate cmd/esi-proxy/rsrc_windows_amd64.syso after changing it
+// with scripts/gen-winres.sh.
+32512 ICON "../../internal/assets/bridge.ico"

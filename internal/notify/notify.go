@@ -5,12 +5,35 @@ package notify
 
 import (
 	"log/slog"
+	"os"
+	"path/filepath"
+	"sync"
 
+	"github.com/BOS-Development/esi-proxy/internal/assets"
 	"github.com/gen2brain/beeep"
 )
 
 func init() {
-	beeep.AppName = "ESI Proxy"
+	beeep.AppName = "ESI Bridge"
+}
+
+var (
+	iconOnce sync.Once
+	iconPath string
+)
+
+// icon returns the path of the app icon written out as a PNG file, or "" if
+// it couldn't be written. beeep also accepts PNG bytes, but then writes a
+// fresh temp file on every notification and never removes it, so the icon is
+// written once per process here instead.
+func icon() string {
+	iconOnce.Do(func() {
+		p := filepath.Join(os.TempDir(), "esi-bridge-icon.png")
+		if err := os.WriteFile(p, assets.PNG, 0o644); err == nil {
+			iconPath = p
+		}
+	})
+	return iconPath
 }
 
 // Send shows a desktop notification. Best-effort: a failure (e.g. no
@@ -19,7 +42,7 @@ func init() {
 func Send(log *slog.Logger, title, message string) {
 	// icon must be a string (path to a .png) or []byte (png data) — beeep
 	// rejects nil outright, so an empty string (no icon) is the no-icon case.
-	if err := beeep.Notify(title, message, ""); err != nil {
+	if err := beeep.Notify(title, message, icon()); err != nil {
 		log.Warn("send desktop notification", "error", err)
 	}
 }

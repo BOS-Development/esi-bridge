@@ -131,7 +131,7 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if errMsg := q.Get("error"); errMsg != "" {
 		s.log.Error("sso login denied", "error", errMsg)
-		notify.Send(s.log, "esi-proxy: login failed", "Login was not completed: "+errMsg)
+		notify.Send(s.log, "ESI Bridge: login failed", "Login was not completed: "+errMsg)
 		writeCallbackPage(w, "Login was not completed: "+errMsg)
 		return
 	}
@@ -155,7 +155,7 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 	tok, err := s.sso.Get().Exchange(r.Context(), code, pending.verifier)
 	if err != nil {
 		s.log.Error("sso token exchange failed", "error", err)
-		notify.Send(s.log, "esi-proxy: login failed", "Could not exchange authorization code.")
+		notify.Send(s.log, "ESI Bridge: login failed", "Could not exchange authorization code.")
 		writeCallbackPage(w, "Login failed: could not exchange authorization code.")
 		return
 	}
@@ -163,14 +163,14 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 	char, err := s.tokenMgr.SaveLogin(pending.accountID, tok)
 	if err != nil {
 		s.log.Error("save login failed", "error", err)
-		notify.Send(s.log, "esi-proxy: login failed", "Could not save the character.")
+		notify.Send(s.log, "ESI Bridge: login failed", "Could not save the character.")
 		writeCallbackPage(w, "Login failed: could not save character.")
 		return
 	}
 
 	s.log.Info("character added", "character_id", char.ID, "character_name", char.Name)
-	notify.Send(s.log, "esi-proxy: character added", fmt.Sprintf("%s was added to esi-proxy.", char.Name))
-	writeCallbackPage(w, fmt.Sprintf("%s was added to esi-proxy. You can close this window.", char.Name))
+	notify.Send(s.log, "ESI Bridge: character added", fmt.Sprintf("%s was added to ESI Bridge.", char.Name))
+	writeCallbackPage(w, fmt.Sprintf("%s was added to ESI Bridge. You can close this window.", char.Name))
 }
 
 func writeCallbackPage(w http.ResponseWriter, message string) {

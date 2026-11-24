@@ -552,7 +552,7 @@ function viewSettings() {
   customLabel.append(custom, " Use a custom EVE SSO Client ID");
   clientBox.appendChild(customLabel);
   clientBox.appendChild(el("p", "hint", s.bundled_client_id
-    ? "By default esi-proxy logs characters in with its own built-in EVE application. Turn this on to use an application you registered yourself."
+    ? "By default ESI Bridge logs characters in with its own built-in EVE application. Turn this on to use an application you registered yourself."
     : "This build has no built-in EVE application, so you need to register your own."));
 
   const customFields = el("div", "custom-client-id");
@@ -712,7 +712,7 @@ function updateSettings(u) {
       status.textContent = "Checking for updates…";
       break;
     case "up_to_date":
-      status.textContent = "ESI Proxy is up to date.";
+      status.textContent = "ESI Bridge is up to date.";
       break;
     case "available":
       status.textContent = `Version ${u.latest_version} is available.`;
@@ -722,7 +722,7 @@ function updateSettings(u) {
       status.textContent = `Downloading version ${u.latest_version}… ${u.progress || 0}%`;
       break;
     case "installing":
-      status.textContent = `Installing version ${u.latest_version}. ESI Proxy will restart.`;
+      status.textContent = `Installing version ${u.latest_version}. ESI Bridge will restart.`;
       break;
     case "error":
       status.textContent = u.error || "The last update check failed.";
@@ -743,8 +743,8 @@ function updateSettings(u) {
       const installBtn = el("button", "btn primary", `Install ${u.latest_version} and restart`);
       installBtn.addEventListener("click", async () => {
         const ok = await confirmDialog({
-          title: `Install ESI Proxy ${u.latest_version}?`,
-          message: "ESI Proxy will download the update, close, and restart on the new version. Apps using the proxy lose their connection for a few seconds.",
+          title: `Install ESI Bridge ${u.latest_version}?`,
+          message: "ESI Bridge will download the update, close, and restart on the new version. Apps using the proxy lose their connection for a few seconds.",
           confirmLabel: "Install and restart",
         });
         if (!ok) return;

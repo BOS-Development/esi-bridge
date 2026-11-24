@@ -1,5 +1,5 @@
 // Command location-watcher is a small, self-contained example of an external
-// application that talks to a running esi-proxy. It walks the full approval
+// application that talks to a running ESI Bridge. It walks the full approval
 // flow a real app would:
 //
 //  1. detect that the proxy is running (GET /healthz);
@@ -45,7 +45,7 @@ var watchScopes = []string{
 const fallbackInterval = 5 * time.Second
 
 func main() {
-	proxyURL := flag.String("proxy", "http://localhost:8085", "base URL of the esi-proxy to connect to")
+	proxyURL := flag.String("proxy", "http://localhost:8085", "base URL of the ESI Bridge to connect to")
 	appName := flag.String("name", "ESI Location Watcher", "name this app registers with the proxy under")
 	pollInterval := flag.Duration("poll", 2*time.Second, "how often to re-check for the user's approval while waiting")
 	reset := flag.Bool("reset", false, "forget the saved api_key for this proxy and register anew")
@@ -69,10 +69,10 @@ func run(ctx context.Context, proxyURL, appName string, pollInterval time.Durati
 	c := newClient(proxyURL)
 
 	// 1. Detect the proxy.
-	fmt.Printf("Looking for esi-proxy at %s ... ", c.BaseURL)
+	fmt.Printf("Looking for ESI Bridge at %s ... ", c.BaseURL)
 	if err := c.Healthz(); err != nil {
 		fmt.Println("not found.")
-		return fmt.Errorf("could not reach the proxy (is esi-proxy running?): %w", err)
+		return fmt.Errorf("could not reach the proxy (is ESI Bridge running?): %w", err)
 	}
 	fmt.Println("found.")
 

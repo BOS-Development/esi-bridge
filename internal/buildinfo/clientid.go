@@ -1,6 +1,6 @@
 package buildinfo
 
-// BundledClientID is the EVE SSO client_id of the esi-proxy application
+// BundledClientID is the EVE SSO client_id of the ESI Bridge application
 // registered by the project. It's used unless the user ticks "Use a custom
 // EVE SSO Client ID" in Settings. EVE SSO with PKCE has no client secret, so a
 // client_id is not sensitive and is safe to ship in the binary.

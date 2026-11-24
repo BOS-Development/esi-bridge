@@ -18,12 +18,12 @@ import (
 const ServiceType = "_esi-proxy._tcp"
 
 // instanceName is the human-readable DNS-SD instance name, e.g.
-// "ESI Proxy (studio)".
+// "ESI Bridge (studio)".
 func instanceName() string {
 	if host, err := os.Hostname(); err == nil && host != "" {
-		return "ESI Proxy (" + shortHost(host) + ")"
+		return "ESI Bridge (" + shortHost(host) + ")"
 	}
-	return "ESI Proxy"
+	return "ESI Bridge"
 }
 
 // shortHost trims a FQDN down to its first label, so a long name (such as a

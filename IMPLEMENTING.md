@@ -1,8 +1,8 @@
-# Implementing esi-proxy support in your application
+# Implementing ESI Bridge support in your application
 
 This guide is for developers of third-party EVE Online tools (fitting tools,
 multiboxing helpers, trackers, and so on) who want to read ESI data through
-**esi-proxy** instead of running their own EVE SSO flow.
+**ESI Bridge** instead of running their own EVE SSO flow.
 
 With the proxy, your app never sees a refresh token, never registers an SSO
 application, and never handles a login callback. The user adds characters to
@@ -34,7 +34,7 @@ For a complete, working client that uses only Go's standard library, see
 
 ```
 ┌────────────┐   X-Proxy-Api-Key    ┌────────────┐   Bearer <token>   ┌─────┐
-│  Your app  │ ───────────────────▶ │ esi-proxy  │ ─────────────────▶ │ ESI │
+│  Your app  │ ───────────────────▶ │ ESI Bridge │ ─────────────────▶ │ ESI │
 └────────────┘ ◀─────────────────── └────────────┘ ◀───────────────── └─────┘
                  ESI response,          │  ▲
                  relayed unchanged      ▼  │ user approves/denies
@@ -76,7 +76,7 @@ When the proxy is running, it advertises itself on the local network:
 | ------------ | -------------------------------------------------------- |
 | Service type | `_esi-proxy._tcp`                                        |
 | Domain       | `local.`                                                 |
-| Instance     | `ESI Proxy (<hostname>)`                                 |
+| Instance     | `ESI Bridge (<hostname>)`                                 |
 | TXT `base_url` | The URL to connect to, e.g. `http://localhost:8085`    |
 | TXT `path`   | Base path, currently `/`                                 |
 
@@ -101,7 +101,7 @@ GET /healthz
 ```
 
 `200 OK` with body `ok` means the proxy is up. If the connection is refused,
-tell the user to start esi-proxy.
+tell the user to start ESI Bridge.
 
 ---
 
@@ -461,7 +461,7 @@ curl -si $BASE/proxy/1978535095/characters/1978535095/location/ \
 import time
 import requests
 
-class EsiProxy:
+class EsiBridge:
     def __init__(self, base_url="http://localhost:8085", api_key=None):
         self.base = base_url.rstrip("/")
         self.s = requests.Session()
@@ -496,10 +496,10 @@ class EsiProxy:
         return self.s.request(method, f"{self.base}/proxy/{character_id}/{path.lstrip('/')}", **kw)
 
 
-proxy = EsiProxy(api_key=load_saved_key())          # your own persistence
+proxy = EsiBridge(api_key=load_saved_key())          # your own persistence
 scopes = ["esi-location.read_location.v1"]
 if proxy.request_access(1978535095, scopes) == "pending":
-    print("Approve 'My Tool' in ESI Proxy → Requests")
+    print("Approve 'My Tool' in ESI Bridge → Requests")
     proxy.wait_for_grant(1978535095, scopes)
 resp = proxy.esi(1978535095, "characters/1978535095/location/")
 print(resp.json(), "fresh until", resp.headers.get("Expires"))
@@ -511,7 +511,7 @@ print(resp.json(), "fresh until", resp.headers.get("Expires"))
 
 - [ ] Discover the proxy over mDNS (`_esi-proxy._tcp`, use the `base_url` TXT
       value), fall back to `http://localhost:8085`, and let the user override it.
-- [ ] Check `GET /healthz` and show a clear "start ESI Proxy" message on failure.
+- [ ] Check `GET /healthz` and show a clear "start ESI Bridge" message on failure.
 - [ ] Register **once**, and store the `api_key` persistently, keyed by `base_url`.
 - [ ] On `401`, register again and request permissions again.
 - [ ] Request `list_characters` (and `list_accounts` only if needed) to build a

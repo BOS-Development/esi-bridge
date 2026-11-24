@@ -61,7 +61,7 @@ type Tray struct {
 	// by NSApplication's default one) belong here instead of before Run.
 	onCocoaReady func()
 
-	// onOpenWindow, if set, backs the "Open ESI Proxy" menu item: it opens
+	// onOpenWindow, if set, backs the "Open ESI Bridge" menu item: it opens
 	// (or re-opens) the native management window. It may block briefly, so
 	// clicks invoke it on their own goroutine.
 	onOpenWindow func()
@@ -102,18 +102,18 @@ func (t *Tray) onReady(ctx context.Context) {
 	}
 
 	systray.SetIcon(icon())
-	systray.SetTitle("ESI Proxy")
+	systray.SetTitle("ESI Bridge")
 
 	t.status = systray.AddMenuItem("", "")
 	t.status.Disable()
 	t.updateAddressDisplay()
 	systray.AddSeparator()
 
-	// "Open ESI Proxy" re-opens the native management window (the app's main
+	// "Open ESI Bridge" re-opens the native management window (the app's main
 	// surface) after it's been closed; the tray otherwise just lingers in the
 	// background. Only shown when a launcher was wired in.
 	if t.onOpenWindow != nil {
-		openWindow := systray.AddMenuItem("Open ESI Proxy", "Open the ESI Proxy window")
+		openWindow := systray.AddMenuItem("Open ESI Bridge", "Open the ESI Bridge window")
 		go func() {
 			for range openWindow.ClickedCh {
 				// May block briefly waiting for the server; don't stall the
@@ -145,7 +145,7 @@ func (t *Tray) onReady(ctx context.Context) {
 		t.updateUpdateItem()
 	}
 
-	quit := systray.AddMenuItem("Quit", "Stop esi-proxy")
+	quit := systray.AddMenuItem("Quit", "Stop ESI Bridge")
 	go func() {
 		<-quit.ClickedCh
 		systray.Quit()
@@ -191,7 +191,7 @@ func (t *Tray) notifyNewGrants() {
 			continue
 		}
 		t.notifiedGrants[p.ID] = true
-		notify.Send(t.log, "esi-proxy: access request",
+		notify.Send(t.log, "ESI Bridge: access request",
 			fmt.Sprintf("%s wants access to %s", p.ApplicationName, p.CharacterName))
 	}
 	// Forget IDs that are no longer pending (approved/denied), so the map
@@ -217,7 +217,7 @@ func (t *Tray) notifyNewPermissions() {
 			continue
 		}
 		t.notifiedPerms[p.ID] = true
-		notify.Send(t.log, "esi-proxy: permission request",
+		notify.Send(t.log, "ESI Bridge: permission request",
 			fmt.Sprintf("%s wants to %s", p.ApplicationName, describePermission(p.Permission)))
 	}
 	for id := range t.notifiedPerms {
@@ -259,10 +259,10 @@ func (t *Tray) updateUpdateItem() {
 		enabled = false
 	case st.CanInstall:
 		title = "Install update (" + st.LatestVersion + ")"
-		tip = "Download and install ESI Proxy " + st.LatestVersion + ", then restart"
+		tip = "Download and install ESI Bridge " + st.LatestVersion + ", then restart"
 	default:
 		title = "Update available (" + st.LatestVersion + ")"
-		tip = "Open the release page to download ESI Proxy " + st.LatestVersion
+		tip = "Open the release page to download ESI Bridge " + st.LatestVersion
 	}
 	key := fmt.Sprintf("%s|%t", title, enabled)
 	if key == t.shownUpdate {
@@ -298,7 +298,7 @@ func (t *Tray) onUpdateClicked() {
 	}
 	if err := t.updater.Install(); err != nil {
 		t.log.Error("install update", "error", err)
-		notify.Send(t.log, "ESI Proxy update failed", err.Error())
+		notify.Send(t.log, "ESI Bridge update failed", err.Error())
 	}
 	// The menu item catches up on the next refresh tick.
 }
@@ -315,7 +315,7 @@ func (t *Tray) updateAddressDisplay() {
 	}
 	t.shownAddr = addr
 	t.status.SetTitle("Running on " + addr)
-	systray.SetTooltip("ESI Proxy — running on " + addr)
+	systray.SetTooltip("ESI Bridge — running on " + addr)
 }
 
 func describePermission(permission string) string {

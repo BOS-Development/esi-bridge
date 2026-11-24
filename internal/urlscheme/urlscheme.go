@@ -1,4 +1,4 @@
-// Package urlscheme registers esi-proxy as the OS handler for the
+// Package urlscheme registers ESI Bridge as the OS handler for the
 // eveauth-proxy:// custom URI scheme used as the EVE SSO redirect_uri, and
 // delivers incoming callback URLs to the already-running instance.
 //
@@ -16,7 +16,7 @@ package urlscheme
 
 import "log/slog"
 
-// Scheme is the custom URI scheme esi-proxy registers as its EVE SSO
+// Scheme is the custom URI scheme ESI Bridge registers as its EVE SSO
 // redirect_uri, i.e. redirect_uri = Scheme + "://callback".
 const Scheme = "eveauth-proxy"
 

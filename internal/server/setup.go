@@ -15,7 +15,7 @@ func (s *Server) handleClientIDForm(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintf(w, `<!doctype html>
 <html><body style="font-family:sans-serif;max-width:32em;margin:4em auto;line-height:1.5">
-<h2>esi-proxy: EVE SSO Client ID</h2>
+<h2>ESI Bridge: EVE SSO Client ID</h2>
 <p>Register an application at
 <a href="https://developers.eveonline.com">developers.eveonline.com</a> with
 connection type <b>Authentication &amp; API Access</b> and callback URL

@@ -40,7 +40,7 @@ func canSelfInstall() (bool, string) {
 			return true, ""
 		}
 	}
-	return false, "This copy of ESI Proxy wasn't installed with the installer, so it can't update itself. Download the new version from the release page."
+	return false, "This copy of ESI Bridge wasn't installed with the installer, so it can't update itself. Download the new version from the release page."
 }
 
 // platformInstall starts the downloaded Inno Setup installer and returns

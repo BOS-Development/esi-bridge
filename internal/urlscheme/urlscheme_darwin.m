@@ -1,5 +1,5 @@
 // Apple Event handler for kAEGetURL: this is how macOS delivers a
-// eveauth-proxy:// URL to esi-proxy when it's already running, instead of
+// eveauth-proxy:// URL to ESI Bridge when it's already running, instead of
 // spawning a new process (which is what Windows/Linux do). It's registered
 // independently of fyne.io/systray's own NSApplication delegate (see
 // systray_darwin.m), so it doesn't conflict with it — NSAppleEventManager

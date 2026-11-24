@@ -2,7 +2,7 @@
 # Builds the macOS installer: dist/esi-proxy-<version>-macos-universal.dmg
 #
 # A drag-to-install disk image holding a release, universal (Apple Silicon +
-# Intel) "ESI Proxy.app" next to an Applications shortcut.
+# Intel) "ESI Bridge.app" next to an Applications shortcut.
 #
 #   ./scripts/package-macos.sh 1.0.42
 #
@@ -18,7 +18,7 @@ if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
 	exit 1
 fi
 
-APP_DIR="ESI Proxy.app"
+APP_DIR="ESI Bridge.app"
 DMG="dist/esi-proxy-${VERSION}-macos-universal.dmg"
 STAGE="dist/macos-dmg"
 
@@ -31,7 +31,7 @@ ln -s /Applications "$STAGE/Applications"
 
 # hdiutil occasionally fails with "Resource busy" on CI runners; retry.
 for attempt in 1 2 3 4 5; do
-	if hdiutil create -volname "ESI Proxy" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then
+	if hdiutil create -volname "ESI Bridge" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then
 		break
 	fi
 	if [[ $attempt == 5 ]]; then
