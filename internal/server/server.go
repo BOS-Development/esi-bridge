@@ -14,6 +14,7 @@ import (
 	"github.com/BOS-Development/esi-proxy/internal/esi"
 	"github.com/BOS-Development/esi-proxy/internal/store"
 	"github.com/BOS-Development/esi-proxy/internal/tokens"
+	"github.com/BOS-Development/esi-proxy/internal/update"
 )
 
 type Server struct {
@@ -46,6 +47,9 @@ type Server struct {
 	// wired in by the process that owns the listener (see SetRebinder);
 	// without it, /manage/bind-host only saves the setting for next start.
 	rebind func(host string) error
+
+	// updater backs /manage/update/*; nil when not wired in (see SetUpdater).
+	updater *update.Updater
 
 	loginMu  sync.Mutex
 	loginTxn map[string]pendingLogin // state -> pending login
@@ -213,6 +217,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /manage/client-id", s.requireSession(s.handleManageSetClientID))
 	mux.HandleFunc("POST /manage/custom-client-id", s.requireSession(s.handleManageSetUseCustomClientID))
 	mux.HandleFunc("POST /manage/bind-host", s.requireSession(s.handleManageSetBindHost))
+	mux.HandleFunc("POST /manage/update/check", s.requireSession(s.handleManageUpdateCheck))
+	mux.HandleFunc("POST /manage/update/install", s.requireSession(s.handleManageUpdateInstall))
+	mux.HandleFunc("POST /manage/update/auto-check", s.requireSession(s.handleManageSetAutoUpdate))
 
 	// Developer-only endpoints, compiled in for every build but only routed
 	// in development builds (the default; not -tags release). See dev.go.

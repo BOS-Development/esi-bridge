@@ -12,6 +12,7 @@ import (
 
 	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-proxy/internal/update"
 	"github.com/BOS-Development/esi-proxy/internal/webui"
 )
 
@@ -153,6 +154,8 @@ type manageState struct {
 	// DevBuild is true in development builds (the default; not -tags release); the UI shows its
 	// developer-only Settings options only then.
 	DevBuild bool `json:"dev_build"`
+	// Update is the auto-updater's status, including the running version.
+	Update update.Status `json:"update"`
 }
 
 func (s *Server) handleManageState(w http.ResponseWriter, r *http.Request) {
@@ -260,6 +263,7 @@ func (s *Server) handleManageState(w http.ResponseWriter, r *http.Request) {
 		PendingPermissions: outPendingPerms,
 		AppPermissions:     outAppPerms,
 		DevBuild:           buildinfo.Dev,
+		Update:             s.updateStatus(),
 	})
 }
 

@@ -14,13 +14,18 @@
 #
 # -Output sets the output path (default: esi-proxy.exe at the repo root).
 #
+# -Version stamps the release version into the binary (buildinfo.Version),
+# which the auto-updater compares against GitHub releases. Without it the
+# build is unversioned and never checks for updates.
+#
 # The bundled EVE SSO Client ID is read from a .clientid file at the repo
 # root (gitignored). Without it the build has no bundled Client ID and users
 # must register their own application.
 param(
 	[switch]$Release,
 	[switch]$Gui,
-	[string]$Output = "esi-proxy.exe"
+	[string]$Output = "esi-proxy.exe",
+	[string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +40,13 @@ if ($Release) {
 $ldflags = @()
 if ($Gui) {
 	$ldflags += "-H=windowsgui"
+}
+
+if ($Version) {
+	if ($Version -notmatch '^\d+(\.\d+){0,3}$') {
+		throw "-Version must be numeric, e.g. 1.0.42 (got '$Version')"
+	}
+	$ldflags += "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.Version=$Version"
 }
 
 if (Test-Path ".clientid") {
@@ -61,4 +73,5 @@ if ($LASTEXITCODE -ne 0) {
 
 $kind = if ($Release) { "release build" } else { "development build" }
 if ($Gui) { $kind += ", GUI subsystem" }
+if ($Version) { $kind += ", version $Version" }
 Write-Host "Built $Output ($kind)"

@@ -50,12 +50,18 @@ if [[ "${RELEASE:-}" == "1" ]]; then
 	TAGS_ARG="-tags=release"
 fi
 
-# VERSION sets the bundle version shown in Finder (default 1.0).
-VERSION="${VERSION:-1.0}"
-if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
-	echo "error: VERSION must be numeric, e.g. 1.0.42 (got '$VERSION')" >&2
-	exit 1
+# VERSION sets the bundle version shown in Finder (default 1.0). When it's
+# given, it's also stamped into the binary (buildinfo.Version), which the
+# auto-updater compares against GitHub releases; without it the build is
+# unversioned and never checks for updates.
+if [[ -n "${VERSION:-}" ]]; then
+	if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+		echo "error: VERSION must be numeric, e.g. 1.0.42 (got '$VERSION')" >&2
+		exit 1
+	fi
+	LDFLAGS="${LDFLAGS} -X github.com/BOS-Development/esi-proxy/internal/buildinfo.Version=${VERSION}"
 fi
+VERSION="${VERSION:-1.0}"
 
 # Oldest macOS the binary supports; keeps Intel and Apple Silicon builds in step.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"

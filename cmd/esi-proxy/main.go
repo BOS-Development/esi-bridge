@@ -15,15 +15,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 	"github.com/BOS-Development/esi-proxy/internal/cache"
 	"github.com/BOS-Development/esi-proxy/internal/config"
 	"github.com/BOS-Development/esi-proxy/internal/cryptox"
 	"github.com/BOS-Development/esi-proxy/internal/db"
 	"github.com/BOS-Development/esi-proxy/internal/esi"
+	"github.com/BOS-Development/esi-proxy/internal/notify"
 	"github.com/BOS-Development/esi-proxy/internal/server"
 	"github.com/BOS-Development/esi-proxy/internal/store"
 	"github.com/BOS-Development/esi-proxy/internal/tokens"
 	"github.com/BOS-Development/esi-proxy/internal/tray"
+	"github.com/BOS-Development/esi-proxy/internal/update"
 	"github.com/BOS-Development/esi-proxy/internal/urlscheme"
 	"github.com/BOS-Development/esi-proxy/internal/worker"
 )
@@ -86,6 +89,9 @@ func main() {
 		case "-h", "--help", "help":
 			printUsage()
 			return
+		case "-v", "--version", "version":
+			fmt.Println("esi-proxy", buildinfo.DisplayVersion())
+			return
 		}
 	}
 
@@ -104,6 +110,7 @@ Usage:
   esi-proxy import --in=bundle.enc           import a bundle onto this machine
   esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
   esi-proxy mdns browse   [--duration D]     debug: discover esi-proxy services on the LAN
+  esi-proxy version                          print the version
   esi-proxy serve-ui                         dev: serve the management UI only (no tray), at /app
   esi-proxy --window --url URL               internal: host the management UI in a native
                                               window (spawned by the running instance)
@@ -177,8 +184,30 @@ func run(log *slog.Logger) error {
 
 	srv := server.New(st, sso, esiClient, respCache, tokenMgr, log, cfg.DataDir, cfg.EVESSOBaseURL, redirectURL)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// quit shuts the app down from the inside: the updater calls it once a
+	// new version has been handed to the installer.
+	ctx, quit := context.WithCancel(sigCtx)
+	defer quit()
+
+	log.Info("starting esi-proxy", "version", buildinfo.DisplayVersion())
+
+	updater := update.New(update.Options{
+		CurrentVersion: buildinfo.Version,
+		AutoCheck:      cfg.AutoCheckUpdates(),
+		Log:            log,
+		Quit:           quit,
+		OnAvailable: func(r update.Release) {
+			notify.Send(log, "ESI Proxy update available",
+				fmt.Sprintf("Version %s is out. Install it from the tray menu or Settings.", r.Version))
+		},
+		OnInstallFailed: func(err error) {
+			notify.Send(log, "ESI Proxy update failed", err.Error())
+		},
+	})
+	srv.SetUpdater(updater)
+	go updater.Run(ctx)
 
 	// netw owns the HTTP listener and the mDNS advert, which lets external
 	// apps (Pyfa, MCO, …) discover the proxy without a hand-configured
@@ -225,7 +254,7 @@ func run(log *slog.Logger) error {
 	// init()), and on macOS Cocoa's run loop only works on that thread.
 	// Quitting the tray (Quit clicked, or ctx canceled) is what unblocks
 	// this call; shutdown continues below once it returns.
-	tray.New(st, srv, netw, log, cfg.Port, onCocoaReady, winLauncher.Open).Run(ctx)
+	tray.New(st, srv, netw, updater, log, cfg.Port, onCocoaReady, winLauncher.Open).Run(ctx)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

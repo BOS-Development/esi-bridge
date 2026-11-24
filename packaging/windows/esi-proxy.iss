@@ -24,6 +24,8 @@
 #define RepoRoot AddBackslash(SourcePath) + "..\.."
 
 [Setup]
+; The app's auto-updater finds the install through this AppId's uninstall
+; key (innoUninstallKey in internal/update/apply_windows.go); keep them in step.
 AppId={{2642D8DA-C1C0-42A3-92C2-037FF57CE3DE}
 AppName={#AppName}
 AppVersion={#AppVersion}
@@ -75,6 +77,15 @@ Root: HKCU; Subkey: "Software\Classes\eveauth-proxy\shell\open\command"; ValueTy
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; The in-app updater runs this installer with /SILENT /RELAUNCH=1, after the
+; old version has quit; start the new version once the files are in place.
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: ShouldRelaunch
+
+[Code]
+function ShouldRelaunch: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
+end;
 
 [UninstallRun]
 ; Stop the running tray app so its files can be removed. User data in

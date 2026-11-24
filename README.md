@@ -39,6 +39,10 @@ Every push to `main` publishes installers on the [Releases](https://github.com/B
 * **Windows** — `esi-proxy-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-proxy`.
 * **macOS** — `esi-proxy-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Proxy** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
+#### Updates
+
+Installed copies check the Releases page for a new version at startup and every 6 hours (turn this off under **Settings → Updates**). When one is out, you get a desktop notification, an **Install update** item in the tray menu, and an Updates panel in Settings. Nothing installs until you click it. The app then downloads the installer, checks it against the SHA-256 digest GitHub recorded for the upload, closes, installs and restarts on the new version. On Windows this only works for copies installed with the setup program. On macOS the app must be in a folder you can write to (such as Applications), not running from the disk image. Otherwise the app links you to the release page. Builds without a version (local `go build`) never check.
+
 To build the installers yourself, put the Client ID in `.clientid` (see below) and run `.\scripts\package-windows.ps1 -Version 1.0.0` (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)) or `./scripts/package-macos.sh 1.0.0`. Output goes to `dist/`.
 
 ### 1. (Optional) Register your own EVE SSO application

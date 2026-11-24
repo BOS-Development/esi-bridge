@@ -661,12 +661,143 @@ function viewSettings() {
     }
   });
 
+  inner.appendChild(updateSettings(s.update || {}));
+
   // Developer options: only in development builds (the default;
   // release builds use -tags release). The server
   // doesn't even route these endpoints in release builds.
   if (s.dev_build) inner.appendChild(devSettings());
 
   return inner;
+}
+
+// updateSettings is the Updates box: the running version, the auto-check
+// toggle, and the state of the latest check / install.
+function updateSettings(u) {
+  const box = el("div", "setting");
+  box.appendChild(el("label", "setting-label", "Updates"));
+  box.appendChild(el("p", "hint", `You're running version ${u.current_version || "dev"}.`));
+
+  if (!u.enabled) {
+    box.appendChild(el("p", "hint", "This is a development build, so it doesn't check for updates."));
+    return box;
+  }
+
+  const autoLabel = el("label", "checkbox");
+  const auto = el("input");
+  auto.type = "checkbox";
+  auto.checked = !!u.auto_check;
+  autoLabel.append(auto, " Check for updates automatically");
+  box.appendChild(autoLabel);
+  box.appendChild(el("p", "hint",
+    "Checks GitHub for a new release at startup and every few hours. Nothing is installed until you choose to."));
+
+  auto.addEventListener("change", async () => {
+    const enabled = auto.checked;
+    try {
+      await api("POST", "/manage/update/auto-check", { enabled });
+      toast(enabled ? "Automatic update checks on" : "Automatic update checks off");
+    } catch (err) {
+      auto.checked = !enabled;
+      toast(err.message, true);
+    }
+    auto.blur();
+    await refreshState();
+  });
+
+  const busy = u.state === "checking" || u.state === "downloading" || u.state === "installing";
+  const status = el("p", "update-status");
+  switch (u.state) {
+    case "checking":
+      status.textContent = "Checking for updates…";
+      break;
+    case "up_to_date":
+      status.textContent = "ESI Proxy is up to date.";
+      break;
+    case "available":
+      status.textContent = `Version ${u.latest_version} is available.`;
+      status.classList.add("available");
+      break;
+    case "downloading":
+      status.textContent = `Downloading version ${u.latest_version}… ${u.progress || 0}%`;
+      break;
+    case "installing":
+      status.textContent = `Installing version ${u.latest_version}. ESI Proxy will restart.`;
+      break;
+    case "error":
+      status.textContent = u.error || "The last update check failed.";
+      status.classList.add("error");
+      break;
+    default:
+      status.textContent = "";
+  }
+  if (status.textContent) box.appendChild(status);
+  if (u.checked_at && !busy) {
+    const abs = absoluteTime(u.checked_at);
+    box.appendChild(el("p", "hint", `Last checked ${relativeFromNow(u.checked_at)}${abs ? ` (${abs})` : ""}.`));
+  }
+
+  const actions = el("div", "input-row");
+  if (u.latest_version && !busy) {
+    if (u.can_install) {
+      const installBtn = el("button", "btn primary", `Install ${u.latest_version} and restart`);
+      installBtn.addEventListener("click", async () => {
+        const ok = await confirmDialog({
+          title: `Install ESI Proxy ${u.latest_version}?`,
+          message: "ESI Proxy will download the update, close, and restart on the new version. Apps using the proxy lose their connection for a few seconds.",
+          confirmLabel: "Install and restart",
+        });
+        if (!ok) return;
+        installBtn.disabled = true;
+        try {
+          await api("POST", "/manage/update/install");
+          toast("Downloading update…");
+        } catch (err) {
+          toast(err.message, true);
+        }
+        installBtn.blur();
+        await refreshState();
+      });
+      actions.appendChild(installBtn);
+    }
+    if (u.release_url) {
+      const notes = el("button", "btn", u.can_install ? "What's new" : "Open release page");
+      notes.addEventListener("click", () => openExternalURL(u.release_url));
+      actions.appendChild(notes);
+    }
+  }
+  const checkBtn = el("button", "btn", "Check now");
+  checkBtn.disabled = busy;
+  checkBtn.addEventListener("click", async () => {
+    checkBtn.disabled = true;
+    try {
+      await api("POST", "/manage/update/check");
+    } catch (err) {
+      toast(err.message, true);
+    }
+    checkBtn.blur();
+    await refreshState();
+  });
+  actions.appendChild(checkBtn);
+  box.appendChild(actions);
+  if (u.latest_version && !u.can_install && u.install_hint) {
+    box.appendChild(el("p", "hint", u.install_hint));
+  }
+  return box;
+}
+
+// openExternalURL opens url in the user's real browser: through the native
+// window's binding when there is one, otherwise a new tab.
+async function openExternalURL(url) {
+  try {
+    if (typeof window.openExternal === "function") {
+      await window.openExternal(url);
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+  } catch (err) {
+    toast(err.message || "Couldn't open the browser", true);
+  }
 }
 
 function devSettings() {
@@ -990,6 +1121,8 @@ function updateChrome(s) {
   });
   const pending = (s.pending_grants || []).length + (s.pending_permissions || []).length;
   document.querySelector('[data-nav-count="requests"]').textContent = pending ? String(pending) : "";
+  const update = s.update || {};
+  document.querySelector('[data-nav-count="settings"]').textContent = update.latest_version ? "Update" : "";
 }
 
 function setOffline() {

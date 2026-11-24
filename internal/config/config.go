@@ -32,6 +32,16 @@ type Config struct {
 	UseCustomClientID *bool  `json:"use_custom_client_id,omitempty"`
 	EVESSOBaseURL     string `json:"eve_sso_base_url"`
 	ESIBaseURL        string `json:"esi_base_url"`
+	// CheckForUpdates turns the periodic check for new releases on or off.
+	// It's a pointer so configs written before the updater existed get the
+	// default (on); see AutoCheckUpdates.
+	CheckForUpdates *bool `json:"check_for_updates,omitempty"`
+}
+
+// AutoCheckUpdates reports whether the app should check for new releases on
+// its own. On unless the user turned it off.
+func (c Config) AutoCheckUpdates() bool {
+	return c.CheckForUpdates == nil || *c.CheckForUpdates
 }
 
 // CustomClientID reports whether the user's own client_id is in use rather

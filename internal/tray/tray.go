@@ -19,6 +19,7 @@ import (
 	"github.com/BOS-Development/esi-proxy/internal/notify"
 	"github.com/BOS-Development/esi-proxy/internal/server"
 	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-proxy/internal/update"
 )
 
 const refreshInterval = 3 * time.Second
@@ -45,6 +46,13 @@ type Tray struct {
 	status    *systray.MenuItem
 	shownAddr string
 
+	// updater, if set, backs the update menu item, which stays hidden until a
+	// newer release is found. shownUpdate records what the item currently
+	// shows, so the refresh only touches it on a change.
+	updater     *update.Updater
+	updateItem  *systray.MenuItem
+	shownUpdate string
+
 	// onCocoaReady, if set, is called once at the start of onReady — after
 	// the native event loop (and on macOS, NSApplication's own startup) has
 	// finished, but before the tray finishes building its menu. Platform
@@ -67,8 +75,9 @@ type Tray struct {
 	notifiedPerms  map[int64]bool
 }
 
-func New(st *store.Store, srv *server.Server, network Network, log *slog.Logger, port int, onCocoaReady, onOpenWindow func()) *Tray {
+func New(st *store.Store, srv *server.Server, network Network, updater *update.Updater, log *slog.Logger, port int, onCocoaReady, onOpenWindow func()) *Tray {
 	return &Tray{
+		updater:        updater,
 		st:             st,
 		srv:            srv,
 		network:        network,
@@ -125,6 +134,17 @@ func (t *Tray) onReady(ctx context.Context) {
 	}()
 	systray.AddSeparator()
 
+	if t.updater != nil {
+		t.updateItem = systray.AddMenuItem("", "")
+		t.updateItem.Hide()
+		go func() {
+			for range t.updateItem.ClickedCh {
+				t.onUpdateClicked()
+			}
+		}()
+		t.updateUpdateItem()
+	}
+
 	quit := systray.AddMenuItem("Quit", "Stop esi-proxy")
 	go func() {
 		<-quit.ClickedCh
@@ -142,6 +162,7 @@ func (t *Tray) onReady(ctx context.Context) {
 			return
 		case <-ticker.C:
 			t.updateAddressDisplay()
+			t.updateUpdateItem()
 			t.pollRequests()
 		}
 	}
@@ -220,6 +241,66 @@ func (t *Tray) onAddCharacter() {
 	if err := browser.Open(url); err != nil {
 		t.log.Error("open browser for login", "error", err, "url", url)
 	}
+}
+
+// updateUpdateItem shows the update menu item while a newer release is
+// available (or being installed), and hides it otherwise.
+func (t *Tray) updateUpdateItem() {
+	if t.updateItem == nil {
+		return
+	}
+	st := t.updater.Status()
+	var title, tip string
+	enabled := true
+	switch {
+	case st.LatestVersion == "":
+	case st.State == update.StateDownloading || st.State == update.StateInstalling:
+		title = "Installing update (" + st.LatestVersion + ")…"
+		enabled = false
+	case st.CanInstall:
+		title = "Install update (" + st.LatestVersion + ")"
+		tip = "Download and install ESI Proxy " + st.LatestVersion + ", then restart"
+	default:
+		title = "Update available (" + st.LatestVersion + ")"
+		tip = "Open the release page to download ESI Proxy " + st.LatestVersion
+	}
+	key := fmt.Sprintf("%s|%t", title, enabled)
+	if key == t.shownUpdate {
+		return
+	}
+	t.shownUpdate = key
+	if title == "" {
+		t.updateItem.Hide()
+		return
+	}
+	t.updateItem.SetTitle(title)
+	t.updateItem.SetTooltip(tip)
+	if enabled {
+		t.updateItem.Enable()
+	} else {
+		t.updateItem.Disable()
+	}
+	t.updateItem.Show()
+}
+
+// onUpdateClicked installs the available update, or opens its release page
+// when this copy can't update itself.
+func (t *Tray) onUpdateClicked() {
+	rel := t.updater.Available()
+	if rel == nil {
+		return
+	}
+	if !t.updater.Status().CanInstall {
+		if err := browser.Open(rel.URL); err != nil {
+			t.log.Error("open release page", "error", err)
+		}
+		return
+	}
+	if err := t.updater.Install(); err != nil {
+		t.log.Error("install update", "error", err)
+		notify.Send(t.log, "ESI Proxy update failed", err.Error())
+	}
+	// The menu item catches up on the next refresh tick.
 }
 
 // updateAddressDisplay updates the status menu item and tooltip to show

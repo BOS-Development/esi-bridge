@@ -27,8 +27,8 @@ Set-Location $root
 $buildDir = Join-Path $root "dist\windows"
 New-Item -ItemType Directory -Force $buildDir | Out-Null
 
-& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Gui -Output (Join-Path $buildDir "esi-proxy.exe")
-& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Output (Join-Path $buildDir "esi-proxy-cli.exe")
+& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Gui -Version $Version -Output (Join-Path $buildDir "esi-proxy.exe")
+& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Version $Version -Output (Join-Path $buildDir "esi-proxy-cli.exe")
 
 $iscc = (Get-Command "ISCC.exe" -ErrorAction SilentlyContinue).Source
 if (-not $iscc) {
