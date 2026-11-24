@@ -16,8 +16,8 @@ import (
 	"github.com/BOS-Development/esi-proxy/internal/webui"
 )
 
-// The management UI is the browser/webview-facing replacement for the tray's
-// approval menus (the tray→window migration). It carries two guards:
+// The management UI is served to the app window (and a browser in
+// serve-ui dev mode). It carries two guards:
 //
 //   - requireLocalUI: the request must come from a loopback address. This
 //     holds even when the proxy is bound to 0.0.0.0 for LAN access — the
@@ -130,8 +130,8 @@ type manageAppPermission struct {
 	Permission      string `json:"permission"`
 }
 
-// manageState is the single snapshot the UI polls, mirroring everything the
-// old tray rendered across its five sections plus the settings it exposed.
+// manageState is the single snapshot the UI polls, covering everything the
+// window renders: characters, accounts, grants, requests and settings.
 type manageState struct {
 	ClientIDSet bool `json:"client_id_set"`
 	// UseCustomClientID is true when the user's own EVE application is in
@@ -273,8 +273,7 @@ type addCharacterResponse struct {
 
 // handleManageAddCharacter begins an SSO login under the default account and
 // returns the URL the UI should open in a real browser (the custom-scheme
-// callback can't be completed inside a webview). Mirrors the tray's old
-// "Add Character" action.
+// callback can't be completed inside a webview).
 func (s *Server) handleManageAddCharacter(w http.ResponseWriter, r *http.Request) {
 	account, err := s.store.GetOrCreateDefaultAccount()
 	if err != nil {

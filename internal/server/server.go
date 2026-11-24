@@ -193,10 +193,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/request-permissions", s.handleRequestPermissions)
 	mux.HandleFunc("/proxy/{character_id}/{esi_path...}", s.handleProxy)
 
-	// Management UI (Phase 1/2 of the tray→window migration). The full UI
-	// page and its static assets are loopback-only; every state-reading or
-	// state-changing /manage call additionally requires the session token.
-	// Both guards live in manage.go.
+	// Management UI. The page and its static assets are loopback-only;
+	// every state-reading or state-changing /manage call additionally
+	// requires the session token. Both guards live in manage.go.
 	mux.HandleFunc("GET /app", s.requireLocalUI(s.handleAppPage))
 	mux.HandleFunc("GET /app/static/", s.requireLocalUI(s.handleAppStatic))
 	mux.HandleFunc("GET /manage/state", s.requireSession(s.handleManageState))
