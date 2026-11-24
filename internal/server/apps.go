@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/BOS-Development/esi-proxy/internal/store"
@@ -148,5 +149,9 @@ func coversScopes(granted, requested []string) bool {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		// The status line is already sent; usually this is the client having
+		// gone away, but a non-encodable value is a bug worth seeing.
+		slog.Warn("write json response", "error", err)
+	}
 }
