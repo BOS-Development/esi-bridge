@@ -134,8 +134,7 @@ func (s *Server) ClientIDSettings() (custom bool, customID string, err error) {
 	return cfg.CustomClientID(), cfg.EVEClientID, nil
 }
 
-// ClientID returns the EVE client_id currently in use, for pre-filling the
-// setup form.
+// ClientID returns the EVE client_id currently in use.
 func (s *Server) ClientID() string {
 	return s.sso.Get().ClientID()
 }
@@ -186,8 +185,6 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /sso/callback", s.handleSSOCallback)
-	mux.HandleFunc("GET /setup/client-id", s.handleClientIDForm)
-	mux.HandleFunc("POST /setup/client-id", s.handleSetClientID)
 	mux.HandleFunc("POST /api/register", s.handleRegisterApp)
 	mux.HandleFunc("GET /api/characters", s.handleListCharacters)
 	mux.HandleFunc("GET /api/accounts", s.handleListAccounts)

@@ -422,7 +422,7 @@ Every endpoint except `/healthz` and `/api/register` requires
 | `GET /api/grants`                     | none                                         | `200` `[{"character_id": int, "character_name": string, "scopes": [string]}]` |
 | `ANY /proxy/{character_id}/{esi_path}`| forwarded to ESI                             | ESI's response, relayed                                         |
 
-The `/app`, `/manage/*`, `/setup/*`, and `/sso/*` routes are for the proxy's own
+The `/app`, `/manage/*`, and `/sso/*` routes are for the proxy's own
 UI. Only local UI code holding the session token can use them. Don't call
 them from your app.
 
