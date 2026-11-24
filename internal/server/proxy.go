@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/BOS-Development/esi-proxy/internal/cache"
 	"github.com/BOS-Development/esi-proxy/internal/esi"
@@ -76,23 +77,39 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// Only a response we're going to cache needs buffering; everything else
+	// (writes, errors, responses without a future Expires) streams straight
+	// through so large bodies aren't held in memory.
+	expiresAt := cache.ParseExpires(resp.Header)
+	if !cacheable || resp.StatusCode >= 400 || !expiresAt.After(time.Now()) {
+		copyHeaders(w, resp.Header)
+		w.WriteHeader(resp.StatusCode)
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			// Headers are already sent, so all we can do is log it.
+			s.log.Warn("stream esi response body", "character_id", characterID, "path", esiPath, "error", err)
+		}
+		return
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		s.log.Error("read esi response body", "error", err)
 		http.Error(w, "upstream response error", http.StatusBadGateway)
 		return
 	}
-
-	if cacheable && resp.StatusCode < 400 {
-		if expiresAt := cache.ParseExpires(resp.Header); !expiresAt.IsZero() {
-			s.cache.Set(key, cache.Entry{StatusCode: resp.StatusCode, Header: resp.Header, Body: body, ExpiresAt: expiresAt})
-		}
-	}
-
+	s.cache.Set(key, cache.Entry{StatusCode: resp.StatusCode, Header: resp.Header, Body: body, ExpiresAt: expiresAt})
 	writeUpstream(w, resp.StatusCode, resp.Header, body)
 }
 
 func writeUpstream(w http.ResponseWriter, status int, header http.Header, body []byte) {
+	copyHeaders(w, header)
+	w.WriteHeader(status)
+	w.Write(body)
+}
+
+// copyHeaders copies an upstream response's headers onto w, minus the
+// hop-by-hop ones.
+func copyHeaders(w http.ResponseWriter, header http.Header) {
 	dst := w.Header()
 	for k, v := range header {
 		dst[k] = v
@@ -100,6 +117,4 @@ func writeUpstream(w http.ResponseWriter, status int, header http.Header, body [
 	for _, h := range hopByHopHeaders {
 		dst.Del(h)
 	}
-	w.WriteHeader(status)
-	w.Write(body)
 }
