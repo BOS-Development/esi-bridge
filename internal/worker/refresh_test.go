@@ -131,8 +131,19 @@ func TestRefreshDueContinuesAfterFailure(t *testing.T) {
 	if fx.access(t, 1) != "stale" {
 		t.Error("failed refresh changed the stored token")
 	}
-	if !strings.Contains(fx.logs.String(), "refresh character token") {
-		t.Errorf("failure not logged: %s", fx.logs.String())
+	if !strings.Contains(fx.logs.String(), "character must log in again") {
+		t.Errorf("invalid_grant not logged as needing re-login: %s", fx.logs.String())
+	}
+
+	// The rejected character is now flagged, so the next tick leaves it alone
+	// instead of calling SSO with the dead token again.
+	before := fx.calls.Load()
+	refreshDue(context.Background(), fx.store, fx.mgr, fx.log)
+	if got := fx.calls.Load(); got != before {
+		t.Errorf("SSO called %d more times for a character flagged for re-login", got-before)
+	}
+	if c, _ := fx.store.GetCharacter(1); c.ReauthReason == "" {
+		t.Error("character rejected with invalid_grant was not flagged")
 	}
 }
 

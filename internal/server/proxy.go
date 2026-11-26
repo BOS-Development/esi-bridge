@@ -10,6 +10,7 @@ import (
 	"github.com/BOS-Development/esi-proxy/internal/cache"
 	"github.com/BOS-Development/esi-proxy/internal/esi"
 	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-proxy/internal/tokens"
 )
 
 // hopByHopHeaders are stripped when relaying the ESI response back to the
@@ -59,6 +60,11 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accessToken, err := s.tokenMgr.EnsureAccessToken(r.Context(), characterID)
+	if errors.Is(err, tokens.ErrReauthRequired) {
+		s.log.Warn("ensure access token: character must log in again", "character_id", characterID, "error", err)
+		http.Error(w, "this character's EVE login has expired or been revoked; it must be logged in again in the ESI Bridge window", http.StatusConflict)
+		return
+	}
 	if err != nil {
 		s.log.Error("ensure access token", "character_id", characterID, "error", err)
 		http.Error(w, "could not obtain a valid access token for this character", http.StatusBadGateway)

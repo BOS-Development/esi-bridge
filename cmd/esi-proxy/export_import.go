@@ -30,6 +30,9 @@ type exportedCharacter struct {
 	AccessToken          string   `json:"access_token"`
 	AccessTokenExpiresAt string   `json:"access_token_expires_at"`
 	Scopes               []string `json:"scopes"`
+	// ClientID is the EVE SSO client_id the tokens belong to ("" if unknown,
+	// including bundles from older versions).
+	ClientID string `json:"client_id,omitempty"`
 }
 
 type bundle struct {
@@ -100,6 +103,7 @@ func runExport(args []string) error {
 			AccessToken:          string(access),
 			AccessTokenExpiresAt: store.FormatTime(c.AccessTokenExpiresAt),
 			Scopes:               c.Scopes,
+			ClientID:             c.ClientID,
 		})
 	}
 
@@ -216,6 +220,7 @@ func runImport(args []string) error {
 			AccessTokenEnc:       accessEnc,
 			AccessTokenExpiresAt: expiresAt,
 			Scopes:               ec.Scopes,
+			ClientID:             ec.ClientID,
 		})
 		if err != nil {
 			return fmt.Errorf("save character %s: %w", ec.Name, err)
@@ -223,6 +228,8 @@ func runImport(args []string) error {
 	}
 
 	fmt.Printf("Imported %d character(s) from %s\n", len(b.Characters), *in)
+	fmt.Println("Stop using these characters on the machine they were exported from: EVE SSO rotates")
+	fmt.Println("refresh tokens, so two installs refreshing the same tokens can invalidate each other.")
 	return nil
 }
 

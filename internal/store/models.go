@@ -23,6 +23,12 @@ type Character struct {
 	// TokensUpdatedAt is when the token pair was last written (login or
 	// refresh), used to show the age of the character's tokens.
 	TokensUpdatedAt time.Time
+	// ClientID is the EVE SSO client_id the refresh token was issued to, or
+	// "" if unknown (characters added before this was recorded).
+	ClientID string
+	// ReauthReason is non-empty when the character's refresh token can no
+	// longer be used and the character has to log in again.
+	ReauthReason string
 }
 
 type Application struct {

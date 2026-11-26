@@ -385,7 +385,8 @@ function viewCharacters() {
     emptyText: "No characters added yet — use Add Character.",
     buildGroup: (shown, empty) => group("On this proxy", shown, empty, (c) => {
       const n = grantsForCharacter(c.id).length;
-      const sub = [c.account_name ? `Account: ${c.account_name}` : null,
+      const sub = [c.reauth_reason ? "⚠ Needs to log in again" : null,
+        c.account_name ? `Account: ${c.account_name}` : null,
         n ? `${plural(n, "application")} with access` : "No application access"]
         .filter(Boolean).join(" · ");
       return linkRow(c.name, sub, `#/characters/${c.id}`);
@@ -887,6 +888,19 @@ function tokenSection(character) {
   return g;
 }
 
+// reauthNotice explains why a character's tokens can no longer be refreshed
+// and offers to log it in again, which replaces its tokens in place (grants
+// are kept, since they're keyed by character ID).
+function reauthNotice(character) {
+  const box = el("div", "notice");
+  box.appendChild(el("div", "notice-title", "This character needs to log in again"));
+  box.appendChild(el("p", "notice-body", character.reauth_reason));
+  const btn = el("button", "btn primary", "Log in again");
+  btn.addEventListener("click", () => startLogin());
+  box.appendChild(btn);
+  return box;
+}
+
 function renderCharacterDetail(id) {
   const inner = el("div", "view-inner");
   inner.appendChild(backLink("#/characters", "Characters"));
@@ -900,6 +914,8 @@ function renderCharacterDetail(id) {
   }
 
   pageHeading(inner, character.name, character.account_name ? `Account: ${character.account_name}` : null);
+
+  if (character.reauth_reason) inner.appendChild(reauthNotice(character));
 
   inner.appendChild(tokenSection(character));
 
@@ -1149,7 +1165,9 @@ async function refreshState() {
 
 // --- static wiring ---
 
-document.getElementById("add-character").addEventListener("click", async () => {
+// startLogin opens EVE SSO to add a character — or, for one already on the
+// proxy, to replace its tokens.
+async function startLogin() {
   try {
     const { login_url } = await api("POST", "/manage/characters/add");
     // SSO must complete in the user's real browser. In the native app window
@@ -1164,7 +1182,9 @@ document.getElementById("add-character").addEventListener("click", async () => {
   } catch (err) {
     toast(err.message, true);
   }
-});
+}
+
+document.getElementById("add-character").addEventListener("click", () => startLogin());
 
 window.addEventListener("hashchange", () => {
   if (lastState) updateChrome(lastState);

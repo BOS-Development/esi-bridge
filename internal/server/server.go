@@ -117,7 +117,17 @@ func (s *Server) updateClientIDConfig(edit func(cfg *config.Config)) error {
 	if err := config.Save(s.dataDir, cfg); err != nil {
 		return err
 	}
+	prev := s.sso.Get().ClientID()
 	s.sso.Set(esi.NewSSO(cfg.ClientID(), s.ssoBaseURL, s.redirectURL, LoginScopes))
+	if cfg.ClientID() != prev {
+		// Characters flagged for re-authorization under the old client get a
+		// fresh attempt under the new one. Those whose tokens are known to
+		// belong to another client are caught by the client_id check without
+		// calling SSO; the rest (unknown client) may simply work again.
+		if err := s.store.ClearAllCharacterReauth(); err != nil {
+			s.log.Warn("clear character re-authorization flags", "error", err)
+		}
+	}
 	return nil
 }
 

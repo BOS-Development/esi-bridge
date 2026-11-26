@@ -60,6 +60,23 @@ func migrate(conn *sql.DB) error {
 			return fmt.Errorf("backfill characters.tokens_updated_at: %w", err)
 		}
 	}
+
+	// client_id and reauth_reason were added later still. Both have constant
+	// defaults, so ADD COLUMN can declare them NOT NULL directly.
+	for _, col := range []struct{ name, def string }{
+		{"client_id", `TEXT NOT NULL DEFAULT ''`},
+		{"reauth_reason", `TEXT NOT NULL DEFAULT ''`},
+	} {
+		has, err := hasColumn(conn, "characters", col.name)
+		if err != nil {
+			return err
+		}
+		if !has {
+			if _, err := conn.Exec(`ALTER TABLE characters ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
+				return fmt.Errorf("add characters.%s: %w", col.name, err)
+			}
+		}
+	}
 	return nil
 }
 

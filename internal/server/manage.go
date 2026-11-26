@@ -12,6 +12,7 @@ import (
 
 	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
 	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-proxy/internal/tokens"
 	"github.com/BOS-Development/esi-proxy/internal/update"
 	"github.com/BOS-Development/esi-proxy/internal/webui"
 )
@@ -94,6 +95,9 @@ type manageCharacter struct {
 	AccessTokenExpiresAt string `json:"access_token_expires_at"`
 	TokensUpdatedAt      string `json:"tokens_updated_at"`
 	CreatedAt            string `json:"created_at"`
+	// ReauthReason is non-empty when the character's tokens can no longer be
+	// refreshed and it has to log in again (via Add Character).
+	ReauthReason string `json:"reauth_reason,omitempty"`
 }
 
 type manageAccount struct {
@@ -186,6 +190,7 @@ func (s *Server) handleManageState(w http.ResponseWriter, r *http.Request) {
 			AccessTokenExpiresAt: formatTimeOrEmpty(c.AccessTokenExpiresAt),
 			TokensUpdatedAt:      formatTimeOrEmpty(c.TokensUpdatedAt),
 			CreatedAt:            formatTimeOrEmpty(c.CreatedAt),
+			ReauthReason:         s.tokenMgr.ReauthReason(c),
 		}
 	}
 
@@ -541,6 +546,19 @@ func (s *Server) handleManageRefreshCharacterTokens(w http.ResponseWriter, r *ht
 		return
 	}
 	if _, err := s.tokenMgr.Refresh(r.Context(), char); err != nil {
+		if errors.Is(err, tokens.ErrReauthRequired) {
+			// Not a fault: the character just has to log in again. The
+			// reason is recorded and shown on the character page.
+			s.log.Warn("force refresh character tokens: character must log in again", "character_id", id, "error", err)
+			msg := err.Error()
+			if fresh, gerr := s.store.GetCharacter(id); gerr == nil {
+				if reason := s.tokenMgr.ReauthReason(fresh); reason != "" {
+					msg = reason
+				}
+			}
+			http.Error(w, msg, http.StatusConflict)
+			return
+		}
 		// A refresh failure is usually an upstream/credential problem (e.g. the
 		// refresh token was revoked at EVE SSO), which the user can act on, so
 		// surface the reason rather than a generic 500.

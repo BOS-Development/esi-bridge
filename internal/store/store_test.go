@@ -196,15 +196,24 @@ func TestUpdateCharacterTokens(t *testing.T) {
 	mustCharacter(t, s, 42, acct.ID, "Zed", time.Now())
 
 	newExpiry := time.Now().Add(20 * time.Minute).UTC().Truncate(time.Millisecond)
-	if err := s.UpdateCharacterTokens(42, []byte("r2"), []byte("a2"), store.FormatTime(newExpiry)); err != nil {
+	if err := s.SetCharacterReauth(42, "revoked"); err != nil {
+		t.Fatalf("SetCharacterReauth: %v", err)
+	}
+	if err := s.UpdateCharacterTokens(42, []byte("r2"), []byte("a2"), store.FormatTime(newExpiry), "client-x"); err != nil {
 		t.Fatalf("UpdateCharacterTokens: %v", err)
 	}
 	got, _ := s.GetCharacter(42)
 	if string(got.RefreshTokenEnc) != "r2" || string(got.AccessTokenEnc) != "a2" || !got.AccessTokenExpiresAt.Equal(newExpiry) {
 		t.Fatalf("after update = %+v", got)
 	}
+	if got.ClientID != "client-x" {
+		t.Errorf("ClientID = %q, want client-x", got.ClientID)
+	}
+	if got.ReauthReason != "" {
+		t.Errorf("ReauthReason = %q, want it cleared by a successful refresh", got.ReauthReason)
+	}
 
-	if err := s.UpdateCharacterTokens(1, nil, nil, store.FormatTime(newExpiry)); !errors.Is(err, store.ErrNotFound) {
+	if err := s.UpdateCharacterTokens(1, nil, nil, store.FormatTime(newExpiry), ""); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("UpdateCharacterTokens(missing) err = %v", err)
 	}
 }
@@ -227,6 +236,56 @@ func TestListCharactersExpiringBefore(t *testing.T) {
 	}
 	if len(due) != 2 || !ids[1] || !ids[2] {
 		t.Fatalf("due = %+v, want characters 1 and 2", due)
+	}
+
+	// A character waiting on re-authorization is never due for refresh.
+	if err := s.SetCharacterReauth(2, "revoked"); err != nil {
+		t.Fatalf("SetCharacterReauth: %v", err)
+	}
+	due, err = s.ListCharactersExpiringBefore(store.FormatTime(now.Add(5 * time.Minute)))
+	if err != nil {
+		t.Fatalf("ListCharactersExpiringBefore: %v", err)
+	}
+	if len(due) != 1 || due[0].ID != 1 {
+		t.Fatalf("due = %+v, want only character 1", due)
+	}
+}
+
+func TestCharacterReauthFlag(t *testing.T) {
+	s := newStore(t)
+	acct := mustAccount(t, s, "Main")
+	mustCharacter(t, s, 1, acct.ID, "A", time.Now())
+	mustCharacter(t, s, 2, acct.ID, "B", time.Now())
+
+	if err := s.SetCharacterReauth(1, "grant revoked"); err != nil {
+		t.Fatalf("SetCharacterReauth: %v", err)
+	}
+	if err := s.SetCharacterReauth(2, "grant revoked"); err != nil {
+		t.Fatalf("SetCharacterReauth: %v", err)
+	}
+	if got, _ := s.GetCharacter(1); got.ReauthReason != "grant revoked" {
+		t.Fatalf("ReauthReason = %q", got.ReauthReason)
+	}
+	if err := s.SetCharacterReauth(999, "x"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("SetCharacterReauth(missing) err = %v, want ErrNotFound", err)
+	}
+
+	// Logging in again (an upsert) clears the flag and records the client.
+	c := mustCharacter(t, s, 1, acct.ID, "A", time.Now())
+	c.ClientID = "client-y"
+	if err := s.UpsertCharacter(c); err != nil {
+		t.Fatalf("UpsertCharacter: %v", err)
+	}
+	got, _ := s.GetCharacter(1)
+	if got.ReauthReason != "" || got.ClientID != "client-y" {
+		t.Fatalf("after re-login: ReauthReason = %q, ClientID = %q", got.ReauthReason, got.ClientID)
+	}
+
+	if err := s.ClearAllCharacterReauth(); err != nil {
+		t.Fatalf("ClearAllCharacterReauth: %v", err)
+	}
+	if got, _ := s.GetCharacter(2); got.ReauthReason != "" {
+		t.Fatalf("ReauthReason after clear-all = %q", got.ReauthReason)
 	}
 }
 

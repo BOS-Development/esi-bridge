@@ -15,7 +15,15 @@ CREATE TABLE IF NOT EXISTS characters (
     created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     -- When the token pair was last written (login or refresh). Drives the
     -- "tokens last refreshed" age shown on the character detail page.
-    tokens_updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    tokens_updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    -- EVE SSO client_id the refresh token was issued to. A refresh token only
+    -- works with the client that issued it. '' = unknown (rows from before
+    -- this column existed); it's filled in on the next successful refresh.
+    client_id               TEXT NOT NULL DEFAULT '',
+    -- Non-empty when EVE SSO has rejected the refresh token (or it belongs to
+    -- a different client_id), so the character must log in again. The
+    -- background worker and proxy stop retrying while it's set.
+    reauth_reason           TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS applications (

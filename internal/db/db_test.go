@@ -63,3 +63,48 @@ func TestMigrateAddsTokensUpdatedAt(t *testing.T) {
 		t.Fatalf("tokens_updated_at = %q, want it backfilled from created_at", updated)
 	}
 }
+
+// TestMigrateAddsReauthColumns checks that the same old database also gains
+// client_id and reauth_reason, defaulting to empty strings for existing rows.
+func TestMigrateAddsReauthColumns(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "esi-proxy.db")
+
+	old, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatalf("open old db: %v", err)
+	}
+	_, err = old.Exec(`
+		CREATE TABLE characters (
+			id                      INTEGER PRIMARY KEY,
+			account_id              INTEGER NOT NULL,
+			name                    TEXT NOT NULL,
+			refresh_token_enc       BLOB NOT NULL,
+			access_token_enc        BLOB NOT NULL,
+			access_token_expires_at TEXT NOT NULL,
+			scopes                  TEXT NOT NULL DEFAULT '',
+			created_at              TEXT NOT NULL DEFAULT '2020-01-02T03:04:05.000Z',
+			tokens_updated_at       TEXT
+		);
+		INSERT INTO characters (id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at)
+		VALUES (1, 1, 'Old Char', x'00', x'00', '2020-01-02T03:04:05.000Z');
+	`)
+	if err != nil {
+		t.Fatalf("seed old schema: %v", err)
+	}
+	old.Close()
+
+	conn, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open (migrate): %v", err)
+	}
+	defer conn.Close()
+
+	var clientID, reason string
+	if err := conn.QueryRow(`SELECT client_id, reauth_reason FROM characters WHERE id = 1`).Scan(&clientID, &reason); err != nil {
+		t.Fatalf("read new columns: %v", err)
+	}
+	if clientID != "" || reason != "" {
+		t.Fatalf("client_id = %q, reauth_reason = %q; want both empty", clientID, reason)
+	}
+}

@@ -389,8 +389,9 @@ JSON body. To tell them apart, check the `Content-Type` and status code.
 | `403`  | Proxy  | `list_accounts` not granted (on `/api/accounts`)                         | Request the permission, or hide account features.               |
 | `403`  | ESI    | The character's token lacks the scope, or ESI denied the request in-game | Tell the user; the character may need to be re-added with more scopes. |
 | `404`  | Proxy  | `unknown character_id` on `/api/request-access`                          | Refresh your character list.                                    |
+| `409`  | Proxy  | The character's EVE login was revoked or has expired, so it must be logged in again in ESI Bridge (on `/proxy/...`) | Don't retry. Tell the user to log the character in again; requests work again once they do. |
 | `429`  | Proxy  | The proxy paused ESI calls because ESI's error budget is nearly used up  | Back off and retry later (ESI's error window is at most 60 s).      |
-| `502`  | Proxy  | Couldn't get a valid token (e.g. the refresh token was revoked), or ESI was unreachable | Retry with backoff; if it continues, ask the user to check the character in the proxy. |
+| `502`  | Proxy  | Couldn't get a valid token due to a temporary problem refreshing it, or ESI was unreachable | Retry with backoff; if it continues, ask the user to check the character in the proxy. |
 | other  | ESI    | Any other ESI status, relayed unchanged                                  | Handle it as you would a direct ESI call.                            |
 
 > **Note:** if no access request exists yet, calling `/proxy/{character_id}/...`
@@ -526,6 +527,7 @@ print(resp.json(), "fresh until", resp.headers.get("Expires"))
 - [ ] Build proxy URLs as `/proxy/{character_id}/{esi_path}`, with no
       `/latest` prefix and with ESI's trailing slashes.
 - [ ] Schedule refreshes from the relayed `Expires` header.
-- [ ] Handle `403` (revoked access), `429` (back off), and `502` (token or
-      upstream problem) without retrying in a loop.
+- [ ] Handle `403` (revoked access), `409` (character must log in again),
+      `429` (back off), and `502` (token or upstream problem) without
+      retrying in a loop.
 - [ ] Don't depend on request headers reaching ESI.
