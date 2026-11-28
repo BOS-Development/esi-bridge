@@ -36,8 +36,8 @@ ESI Bridge is a single Go binary with a desktop app window (backed by a small ba
 
 Every push to `main` publishes installers on the [Releases](https://github.com/BOS-Development/esi-proxy/releases) page, built with the project's EVE SSO Client ID:
 
-* **Windows** — `esi-proxy-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-proxy`.
-* **macOS** — `esi-proxy-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Bridge** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
+* **Windows** — `esi-bridge-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-proxy`.
+* **macOS** — `esi-bridge-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Bridge** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
 #### Updates
 
@@ -143,7 +143,7 @@ By default the proxy binds to `localhost`, so only applications **on the same ma
 ./esi-proxy import --in=bundle.enc      # on the other machine, same passphrase
 ```
 
-On an installed Windows copy, run these with `esi-proxy-cli.exe` from the install folder (`%LOCALAPPDATA%\Programs\ESI Bridge`). The main `esi-proxy.exe` there is built without a console, so it can't prompt for a passphrase.
+On an installed Windows copy, run these with `esi-bridge-cli.exe` from the install folder (`%LOCALAPPDATA%\Programs\ESI Bridge`). The main `esi-bridge.exe` there is built without a console, so it can't prompt for a passphrase.
 
 ### Running tests
 

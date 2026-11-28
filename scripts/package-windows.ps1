@@ -1,10 +1,10 @@
-# Builds the Windows installer: dist\esi-proxy-<version>-windows-x64-setup.exe
+# Builds the Windows installer: dist\esi-bridge-<version>-windows-x64-setup.exe
 #
 # Compiles two release binaries and wraps them with Inno Setup
-# (packaging\windows\esi-proxy.iss):
-#   esi-proxy.exe      GUI subsystem: what the shortcuts and the
+# (packaging\windows\esi-bridge.iss):
+#   esi-bridge.exe     GUI subsystem: what the shortcuts and the
 #                      eveauth-proxy:// handler launch (no console window)
-#   esi-proxy-cli.exe  console subsystem: for `export` / `import` / `mdns`
+#   esi-bridge-cli.exe console subsystem: for `export` / `import` / `mdns`
 #
 # Requires a C toolchain (see scripts/build-windows.ps1) and Inno Setup 6
 # (https://jrsoftware.org/isinfo.php, or `choco install innosetup`).
@@ -27,8 +27,8 @@ Set-Location $root
 $buildDir = Join-Path $root "dist\windows"
 New-Item -ItemType Directory -Force $buildDir | Out-Null
 
-& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Gui -Version $Version -Output (Join-Path $buildDir "esi-proxy.exe")
-& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Version $Version -Output (Join-Path $buildDir "esi-proxy-cli.exe")
+& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Gui -Version $Version -Output (Join-Path $buildDir "esi-bridge.exe")
+& (Join-Path $PSScriptRoot "build-windows.ps1") -Release -Version $Version -Output (Join-Path $buildDir "esi-bridge-cli.exe")
 
 $iscc = (Get-Command "ISCC.exe" -ErrorAction SilentlyContinue).Source
 if (-not $iscc) {
@@ -43,9 +43,9 @@ if (-not $iscc) {
 }
 
 $outDir = Join-Path $root "dist"
-& $iscc "/DAppVersion=$Version" "/DBuildDir=$buildDir" "/DOutputDir=$outDir" (Join-Path $root "packaging\windows\esi-proxy.iss")
+& $iscc "/DAppVersion=$Version" "/DBuildDir=$buildDir" "/DOutputDir=$outDir" (Join-Path $root "packaging\windows\esi-bridge.iss")
 if ($LASTEXITCODE -ne 0) {
 	throw "ISCC failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "Built dist\esi-proxy-$Version-windows-x64-setup.exe"
+Write-Host "Built dist\esi-bridge-$Version-windows-x64-setup.exe"

@@ -1,4 +1,4 @@
-// Windows resources linked into esi-proxy.exe: the ESI Bridge icon.
+// Windows resources linked into esi-bridge.exe: the ESI Bridge icon.
 //
 // ID 32512 is IDI_APPLICATION, which the webview window loads from the
 // module for its title bar / taskbar icon; Explorer also shows it as the exe

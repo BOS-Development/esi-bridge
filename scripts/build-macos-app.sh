@@ -78,7 +78,7 @@ VERSION="${VERSION:-1.0}"
 # Oldest macOS the binary supports; keeps Intel and Apple Silicon builds in step.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
-BIN="$APP_DIR/Contents/MacOS/esi-proxy"
+BIN="$APP_DIR/Contents/MacOS/esi-bridge"
 if [[ "${UNIVERSAL:-}" == "1" ]]; then
 	# UNIVERSAL=1 builds a fat binary that runs natively on both Apple Silicon
 	# and Intel Macs. cgo is off by default when cross-compiling, so it's
@@ -105,7 +105,7 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
-	<string>esi-proxy</string>
+	<string>esi-bridge</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

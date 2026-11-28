@@ -12,7 +12,7 @@ import (
 )
 
 // bundlePath returns the .app bundle the running binary lives in
-// (…/ESI Bridge.app/Contents/MacOS/esi-proxy → …/ESI Bridge.app).
+// (…/ESI Bridge.app/Contents/MacOS/esi-bridge → …/ESI Bridge.app).
 func bundlePath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
