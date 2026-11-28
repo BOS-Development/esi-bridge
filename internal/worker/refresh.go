@@ -5,11 +5,12 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
 )
 
 const (
@@ -44,6 +45,12 @@ func refreshDue(ctx context.Context, s *store.Store, mgr *tokens.Manager, log *s
 
 	for _, char := range due {
 		if _, err := mgr.Refresh(ctx, char); err != nil {
+			if errors.Is(err, tokens.ErrReauthRequired) {
+				// The character is now flagged and won't be listed again
+				// until it logs in again, so this logs once, not every tick.
+				log.Warn("character must log in again", "character_id", char.ID, "character_name", char.Name, "error", err)
+				continue
+			}
 			log.Error("refresh character token", "character_id", char.ID, "character_name", char.Name, "error", err)
 			continue
 		}

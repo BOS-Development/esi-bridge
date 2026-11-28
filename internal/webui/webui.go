@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/assets"
+	"github.com/BOS-Development/esi-bridge/internal/assets"
 )
 
 //go:embed assets

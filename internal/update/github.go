@@ -185,7 +185,7 @@ func (u *Updater) download(ctx context.Context, a Asset, dir string, progress fu
 }
 
 func (u *Updater) userAgent() string {
-	return "esi-proxy-updater/" + u.current.String() + " (" + runtime.GOOS + ")"
+	return "esi-bridge-updater/" + u.current.String() + " (" + runtime.GOOS + ")"
 }
 
 type progressWriter struct {

@@ -1,4 +1,4 @@
-# Builds esi-proxy.exe for Windows.
+# Builds esi-bridge.exe for Windows.
 #
 # Requires a C toolchain (CGO) on PATH, e.g. gcc from MSYS2/MinGW or TDM-GCC:
 # the app window embeds the native WebView2 webview. The WebView2 runtime
@@ -12,7 +12,7 @@
 # subcommands (export/import/mdns) need a console, so they won't work from a
 # -Gui build; scripts/package-windows.ps1 ships both variants.
 #
-# -Output sets the output path (default: esi-proxy.exe at the repo root).
+# -Output sets the output path (default: esi-bridge.exe at the repo root).
 #
 # -Version stamps the release version into the binary (buildinfo.Version),
 # which the auto-updater compares against GitHub releases. Without it the
@@ -24,7 +24,7 @@
 param(
 	[switch]$Release,
 	[switch]$Gui,
-	[string]$Output = "esi-proxy.exe",
+	[string]$Output = "esi-bridge.exe",
 	[string]$Version = ""
 )
 
@@ -46,7 +46,7 @@ if ($Version) {
 	if ($Version -notmatch '^\d+(\.\d+){0,3}$') {
 		throw "-Version must be numeric, e.g. 1.0.42 (got '$Version')"
 	}
-	$ldflags += "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.Version=$Version"
+	$ldflags += "-X github.com/BOS-Development/esi-bridge/internal/buildinfo.Version=$Version"
 }
 
 if (Test-Path ".clientid") {
@@ -54,7 +54,7 @@ if (Test-Path ".clientid") {
 	if ($clientID -notmatch '^[A-Za-z0-9]+$') {
 		throw ".clientid must contain only the EVE SSO Client ID (letters and digits)"
 	}
-	$ldflags += "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=$clientID"
+	$ldflags += "-X github.com/BOS-Development/esi-bridge/internal/buildinfo.BundledClientID=$clientID"
 } else {
 	Write-Warning "no .clientid file; building without a bundled Client ID (users must set a custom one)"
 }
@@ -63,7 +63,7 @@ if ($ldflags.Count -gt 0) {
 	$buildArgs += @("-ldflags", ($ldflags -join " "))
 }
 
-$buildArgs += @("-o", $Output, "./cmd/esi-proxy")
+$buildArgs += @("-o", $Output, "./cmd/esi-bridge")
 
 $env:CGO_ENABLED = "1"
 & go @buildArgs

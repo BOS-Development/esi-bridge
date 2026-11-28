@@ -228,6 +228,16 @@ h1.page-title {
 .token-stat-abs { font-size: 0.75rem; color: var(--muted); }
 .token-actions { padding: 0.25rem 0.25rem 0; }
 
+/* --- re-authorization notice (character detail) --- */
+.notice {
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+  margin: 0 0 1rem;
+}
+.notice-title { font-weight: 600; color: var(--danger); }
+.notice-body { margin: 0.35rem 0 0.6rem; word-break: break-word; }
+
 /* --- danger zone (character detail) --- */
 .danger-zone .group-label { color: var(--danger); border-bottom-color: var(--danger); }
 .danger-zone .hint { margin: 0.5rem 0.25rem; }

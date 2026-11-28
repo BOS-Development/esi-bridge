@@ -94,12 +94,12 @@ func (s *Store) ListAccounts() ([]Account, error) {
 // --- characters ---
 
 // UpsertCharacter stores or replaces a character's tokens, e.g. after SSO
-// login or an import.
+// login or an import. Fresh tokens clear any pending re-authorization.
 func (s *Store) UpsertCharacter(c Character) error {
 	ts := now()
 	_, err := s.db.Exec(`
-		INSERT INTO characters (id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at, tokens_updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO characters (id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at, tokens_updated_at, client_id, reauth_reason)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
 		ON CONFLICT(id) DO UPDATE SET
 			account_id = excluded.account_id,
 			name = excluded.name,
@@ -107,9 +107,11 @@ func (s *Store) UpsertCharacter(c Character) error {
 			access_token_enc = excluded.access_token_enc,
 			access_token_expires_at = excluded.access_token_expires_at,
 			scopes = excluded.scopes,
-			tokens_updated_at = excluded.tokens_updated_at
+			tokens_updated_at = excluded.tokens_updated_at,
+			client_id = excluded.client_id,
+			reauth_reason = ''
 	`, c.ID, c.AccountID, c.Name, c.RefreshTokenEnc, c.AccessTokenEnc,
-		FormatTime(c.AccessTokenExpiresAt), joinScopes(c.Scopes), ts, ts)
+		FormatTime(c.AccessTokenExpiresAt), joinScopes(c.Scopes), ts, ts, c.ClientID)
 	if err != nil {
 		return fmt.Errorf("upsert character: %w", err)
 	}
@@ -117,10 +119,12 @@ func (s *Store) UpsertCharacter(c Character) error {
 }
 
 // UpdateCharacterTokens is called after a token refresh, which may rotate
-// the refresh token as well as issuing a new access token.
-func (s *Store) UpdateCharacterTokens(id int64, refreshTokenEnc, accessTokenEnc []byte, expiresAt string) error {
-	res, err := s.db.Exec(`UPDATE characters SET refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?, tokens_updated_at = ? WHERE id = ?`,
-		refreshTokenEnc, accessTokenEnc, expiresAt, now(), id)
+// the refresh token as well as issuing a new access token. clientID is the
+// SSO client that performed the refresh, which proves the token belongs to
+// it; a successful refresh also clears any pending re-authorization.
+func (s *Store) UpdateCharacterTokens(id int64, refreshTokenEnc, accessTokenEnc []byte, expiresAt, clientID string) error {
+	res, err := s.db.Exec(`UPDATE characters SET refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?, tokens_updated_at = ?, client_id = ?, reauth_reason = '' WHERE id = ?`,
+		refreshTokenEnc, accessTokenEnc, expiresAt, now(), clientID, id)
 	if err != nil {
 		return err
 	}
@@ -130,11 +134,32 @@ func (s *Store) UpdateCharacterTokens(id int64, refreshTokenEnc, accessTokenEnc 
 	return nil
 }
 
+// SetCharacterReauth marks a character as needing to log in again, with a
+// human-readable reason. The refresh worker skips it until it's cleared.
+func (s *Store) SetCharacterReauth(id int64, reason string) error {
+	res, err := s.db.Exec(`UPDATE characters SET reauth_reason = ? WHERE id = ?`, reason, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ClearAllCharacterReauth clears every character's re-authorization flag,
+// e.g. after the SSO client_id changes, so each one gets a fresh attempt
+// under the new client.
+func (s *Store) ClearAllCharacterReauth() error {
+	_, err := s.db.Exec(`UPDATE characters SET reauth_reason = '' WHERE reauth_reason != ''`)
+	return err
+}
+
 func scanCharacter(row interface{ Scan(...any) error }) (Character, error) {
 	var c Character
 	var expiresAt, createdAt, scopes string
 	var tokensUpdatedAt sql.NullString
-	err := row.Scan(&c.ID, &c.AccountID, &c.Name, &c.RefreshTokenEnc, &c.AccessTokenEnc, &expiresAt, &scopes, &createdAt, &tokensUpdatedAt)
+	err := row.Scan(&c.ID, &c.AccountID, &c.Name, &c.RefreshTokenEnc, &c.AccessTokenEnc, &expiresAt, &scopes, &createdAt, &tokensUpdatedAt, &c.ClientID, &c.ReauthReason)
 	if err != nil {
 		return Character{}, err
 	}
@@ -151,7 +176,7 @@ func scanCharacter(row interface{ Scan(...any) error }) (Character, error) {
 	return c, nil
 }
 
-const characterColumns = `id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at, tokens_updated_at`
+const characterColumns = `id, account_id, name, refresh_token_enc, access_token_enc, access_token_expires_at, scopes, created_at, tokens_updated_at, client_id, reauth_reason`
 
 func (s *Store) GetCharacter(id int64) (Character, error) {
 	row := s.db.QueryRow(`SELECT `+characterColumns+` FROM characters WHERE id = ?`, id)
@@ -195,9 +220,10 @@ func (s *Store) ListCharacters() ([]Character, error) {
 }
 
 // ListCharactersExpiringBefore returns characters whose access token expires
-// before the given RFC3339Nano timestamp, for the refresh worker.
+// before the given RFC3339Nano timestamp, for the refresh worker. Characters
+// waiting to be re-authorized are left out: refreshing them can't succeed.
 func (s *Store) ListCharactersExpiringBefore(cutoffRFC3339 string) ([]Character, error) {
-	rows, err := s.db.Query(`SELECT `+characterColumns+` FROM characters WHERE access_token_expires_at < ?`, cutoffRFC3339)
+	rows, err := s.db.Query(`SELECT `+characterColumns+` FROM characters WHERE access_token_expires_at < ? AND reauth_reason = ''`, cutoffRFC3339)
 	if err != nil {
 		return nil, err
 	}

@@ -1,5 +1,5 @@
 # Build artifacts
-/esi-proxy
+/esi-bridge
 /location-watcher
 /*.app
 *.exe

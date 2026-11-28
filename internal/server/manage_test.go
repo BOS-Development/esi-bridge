@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
 )
 
 var tokenRe = regexp.MustCompile(`name="session-token" content="([0-9a-f]+)"`)
@@ -533,5 +533,57 @@ func TestManageToggleCustomClientID(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("disable custom without bundled ID: status = %d, want 400", resp.StatusCode)
+	}
+}
+
+// TestManageClientMismatchNeedsReauth covers a character whose tokens were
+// issued to a different client_id: the forced refresh reports 409 with the
+// reason (without calling SSO), the state shows it, and switching to the
+// issuing client clears it.
+func TestManageClientMismatchNeedsReauth(t *testing.T) {
+	ts, st, _ := newTestServer(t)
+	token := uiToken(t, ts)
+
+	c, err := st.GetCharacter(999)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ClientID = "issuing-client"
+	if err := st.UpsertCharacter(c); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := manageReq(t, ts, http.MethodPost, "/manage/characters/999/refresh", token, nil)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("refresh with mismatched client: status = %d (%s), want 409", resp.StatusCode, body)
+	}
+	if !bytes.Contains(body, []byte("different EVE application")) {
+		t.Fatalf("refresh body = %q, want the client mismatch reason", body)
+	}
+
+	reasonOf := func() string {
+		for _, ch := range stateList(t, manageState(t, ts, token), "characters") {
+			m := ch.(map[string]any)
+			if m["id"].(float64) == 999 {
+				r, _ := m["reauth_reason"].(string)
+				return r
+			}
+		}
+		t.Fatal("character 999 missing from state")
+		return ""
+	}
+	if reasonOf() == "" {
+		t.Fatal("state reauth_reason empty for a character needing re-login")
+	}
+
+	resp = manageReq(t, ts, http.MethodPost, "/manage/client-id", token, map[string]any{"client_id": "issuing-client"})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("set client_id: status = %d, want 204", resp.StatusCode)
+	}
+	if r := reasonOf(); r != "" {
+		t.Fatalf("reauth_reason after switching to the issuing client = %q, want empty", r)
 	}
 }

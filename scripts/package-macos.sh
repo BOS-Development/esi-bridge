@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the macOS installer: dist/esi-proxy-<version>-macos-universal.dmg
+# Builds the macOS installer: dist/esi-bridge-<version>-macos-universal.dmg
 #
 # A drag-to-install disk image holding a release, universal (Apple Silicon +
 # Intel) "ESI Bridge.app" next to an Applications shortcut.
@@ -19,7 +19,7 @@ if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
 fi
 
 APP_DIR="ESI Bridge.app"
-DMG="dist/esi-proxy-${VERSION}-macos-universal.dmg"
+DMG="dist/esi-bridge-${VERSION}-macos-universal.dmg"
 STAGE="dist/macos-dmg"
 
 RELEASE=1 UNIVERSAL=1 VERSION="$VERSION" ./scripts/build-macos-app.sh

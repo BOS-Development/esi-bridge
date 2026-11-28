@@ -1,6 +1,6 @@
 package tray
 
-import "github.com/BOS-Development/esi-proxy/internal/assets"
+import "github.com/BOS-Development/esi-bridge/internal/assets"
 
 // icon returns the tray icon as .ico bytes. fyne.io/systray on Windows loads
 // the icon via the Win32 LoadImage API with IMAGE_ICON, which requires a

@@ -48,7 +48,7 @@ The integration has four steps:
 1. **Find** the proxy (default `http://localhost:8085`, or discover it over mDNS).
 2. **Register** once to get an `api_key`. Store the key and reuse it.
 3. **Request** what you need. The user approves or denies each request in the
-   proxy's **Requests** view. There are two kinds of request:
+   proxy's **Pending Requests** view. There are two kinds of request:
    * *app-wide permissions*, such as seeing the full character list
    * *per-character access* to a set of ESI scopes
 4. **Call ESI** at `/proxy/{character_id}/{esi_path}`. The proxy adds the
@@ -284,8 +284,8 @@ Guidelines:
   your waiting UI (for example, 2–5 minutes). When it expires, offer a *"Request
   again"* button rather than re-submitting in a loop.
 * Show the user what to do, for example: *"Approve **My Fitting Tool** in ESI
-  Proxy → Requests."* If the proxy window is closed, it also shows a desktop
-  notification.
+  Bridge → Pending Requests."* ESI Bridge also shows a desktop notification for
+  each new request, so the user sees it even when the window is closed.
 
 ### Revocation
 
@@ -360,8 +360,9 @@ POST /proxy/1978535095/ui/autopilot/waypoint/?destination_id=30000142&add_to_beg
 
 The proxy caches every successful (`< 400`) **GET** response in memory until
 the time in ESI's `Expires` header. Cache entries are separate for each
-character, path, and query string. Error responses and non-GET requests are
-never cached.
+character, path, and query string. Error responses, non-GET requests, and
+responses without a future `Expires` are never cached; they are streamed
+straight through to your app.
 
 What this means for your app:
 
@@ -388,13 +389,16 @@ JSON body. To tell them apart, check the `Content-Type` and status code.
 | `403`  | Proxy  | `list_accounts` not granted (on `/api/accounts`)                         | Request the permission, or hide account features.               |
 | `403`  | ESI    | The character's token lacks the scope, or ESI denied the request in-game | Tell the user; the character may need to be re-added with more scopes. |
 | `404`  | Proxy  | `unknown character_id` on `/api/request-access`                          | Refresh your character list.                                    |
+| `409`  | Proxy  | The character's EVE login was revoked or has expired, so it must be logged in again in ESI Bridge (on `/proxy/...`) | Don't retry. Tell the user to log the character in again; requests work again once they do. |
 | `429`  | Proxy  | The proxy paused ESI calls because ESI's error budget is nearly used up  | Back off and retry later (ESI's error window is at most 60 s).      |
-| `502`  | Proxy  | Couldn't get a valid token (e.g. the refresh token was revoked), or ESI was unreachable | Retry with backoff; if it continues, ask the user to check the character in the proxy. |
+| `502`  | Proxy  | Couldn't get a valid token due to a temporary problem refreshing it, or ESI was unreachable | Retry with backoff; if it continues, ask the user to check the character in the proxy. |
 | other  | ESI    | Any other ESI status, relayed unchanged                                  | Handle it as you would a direct ESI call.                            |
 
-> **Note:** calling `/proxy/{character_id}/...` without a grant also creates a
-> pending access request with **no scopes** for that character. Don't rely on
-> this. Call `/api/request-access` with your real scope list, so the user can
+> **Note:** if no access request exists yet, calling `/proxy/{character_id}/...`
+> without a grant also creates a pending access request with **no scopes** for
+> that character. It never changes a request you already made, so a `/proxy`
+> call made while you wait for approval won't erase your scope list. Don't rely
+> on this. Call `/api/request-access` with your real scope list, so the user can
 > see what they are approving.
 
 ### Be a good ESI citizen
@@ -499,7 +503,7 @@ class EsiBridge:
 proxy = EsiBridge(api_key=load_saved_key())          # your own persistence
 scopes = ["esi-location.read_location.v1"]
 if proxy.request_access(1978535095, scopes) == "pending":
-    print("Approve 'My Tool' in ESI Bridge → Requests")
+    print("Approve 'My Tool' in ESI Bridge → Pending Requests")
     proxy.wait_for_grant(1978535095, scopes)
 resp = proxy.esi(1978535095, "characters/1978535095/location/")
 print(resp.json(), "fresh until", resp.headers.get("Expires"))
@@ -523,6 +527,7 @@ print(resp.json(), "fresh until", resp.headers.get("Expires"))
 - [ ] Build proxy URLs as `/proxy/{character_id}/{esi_path}`, with no
       `/latest` prefix and with ESI's trailing slashes.
 - [ ] Schedule refreshes from the relayed `Expires` header.
-- [ ] Handle `403` (revoked access), `429` (back off), and `502` (token or
-      upstream problem) without retrying in a loop.
+- [ ] Handle `403` (revoked access), `409` (character must log in again),
+      `429` (back off), and `502` (token or upstream problem) without
+      retrying in a loop.
 - [ ] Don't depend on request headers reaching ESI.

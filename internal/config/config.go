@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
 )
 
 // Config holds the settings needed to run the proxy. By default the proxy
@@ -76,6 +76,14 @@ func defaults(dataDir string) Config {
 	}
 }
 
+// dirName is the data directory's name within the OS config directory.
+// legacyDirName is the name it had before the rename to ESI Bridge; an
+// existing one is moved to dirName on first start (see dirIn).
+const (
+	dirName       = "esi-bridge"
+	legacyDirName = "esi-proxy"
+)
+
 // Dir returns the OS-appropriate directory the proxy stores its config and
 // database in, creating it if necessary.
 func Dir() (string, error) {
@@ -83,11 +91,37 @@ func Dir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "esi-proxy")
+	return dirIn(base)
+}
+
+// dirIn returns the data directory within base, creating it if necessary.
+// A data directory left by a release from before the rename is moved into
+// place first. If that move fails (on Windows, an old copy still running
+// holds its database open), the legacy directory is used as is, so no
+// accounts or tokens go missing; the move is retried on the next start.
+func dirIn(base string) (string, error) {
+	dir := filepath.Join(base, dirName)
+	legacy := filepath.Join(base, legacyDirName)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		if info, lerr := os.Stat(legacy); lerr == nil && info.IsDir() {
+			if rerr := os.Rename(legacy, dir); rerr != nil {
+				return legacy, nil
+			}
+		}
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
 	return dir, nil
+}
+
+// isLegacyDirFor reports whether p is the pre-rename data directory that
+// dir replaced, i.e. the same parent with legacyDirName.
+func isLegacyDirFor(p, dir string) bool {
+	if filepath.Base(dir) != dirName {
+		return false
+	}
+	return filepath.Clean(p) == filepath.Join(filepath.Dir(dir), legacyDirName)
 }
 
 // Load reads the config file from dir, creating one populated with defaults
@@ -111,7 +145,9 @@ func Load(dir string) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, err
 	}
-	if cfg.DataDir == "" {
+	// Configs written before the rename record the old data directory, which
+	// dirIn has since moved to dir.
+	if cfg.DataDir == "" || isLegacyDirFor(cfg.DataDir, dir) {
 		cfg.DataDir = dir
 	}
 	if cfg.BindHost == "" {

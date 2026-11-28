@@ -24,7 +24,7 @@ const lsregisterPath = "/System/Library/Frameworks/CoreServices.framework/Versio
 // Services. Launch Services can only route a custom URL scheme to a proper
 // .app bundle (Info.plist CFBundleURLTypes) — there is no way to register a
 // bare Mach-O binary, so this fails descriptively when not running from one
-// (e.g. a plain `go build && ./esi-proxy`, rather than
+// (e.g. a plain `go build && ./esi-bridge`, rather than
 // scripts/build-macos-app.sh).
 func register() error {
 	exe, err := os.Executable()

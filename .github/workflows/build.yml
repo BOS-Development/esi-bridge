@@ -59,7 +59,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
-          path: dist/esi-proxy-*-windows-x64-setup.exe
+          path: dist/esi-bridge-*-windows-x64-setup.exe
           if-no-files-found: error
 
   package-macos:
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: macos-installer
-          path: dist/esi-proxy-*-macos-universal.dmg
+          path: dist/esi-bridge-*-macos-universal.dmg
           if-no-files-found: error
 
   release:

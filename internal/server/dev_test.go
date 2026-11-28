@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
 )
 
 // The developer-only endpoints must exist only in development builds, and the

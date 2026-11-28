@@ -27,7 +27,7 @@ import (
 )
 
 // Repo is the GitHub repository releases are published to.
-const Repo = "BOS-Development/esi-proxy"
+const Repo = "BOS-Development/esi-bridge"
 
 const (
 	defaultAPIBaseURL = "https://api.github.com"
@@ -409,7 +409,7 @@ func (u *Updater) downloadAndApply(rel Release) error {
 	return nil
 }
 
-const downloadDirPrefix = "esi-proxy-update-"
+const downloadDirPrefix = "esi-bridge-update-"
 
 // cleanupOldDownloads removes download folders left by earlier updates.
 func cleanupOldDownloads(log *slog.Logger) {

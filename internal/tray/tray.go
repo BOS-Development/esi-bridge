@@ -15,11 +15,11 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/BOS-Development/esi-proxy/internal/browser"
-	"github.com/BOS-Development/esi-proxy/internal/notify"
-	"github.com/BOS-Development/esi-proxy/internal/server"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/update"
+	"github.com/BOS-Development/esi-bridge/internal/browser"
+	"github.com/BOS-Development/esi-bridge/internal/notify"
+	"github.com/BOS-Development/esi-bridge/internal/server"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/update"
 )
 
 const refreshInterval = 3 * time.Second
@@ -66,27 +66,28 @@ type Tray struct {
 	// clicks invoke it on their own goroutine.
 	onOpenWindow func()
 
-	// notifiedGrants / notifiedPerms track the pending request IDs already
-	// surfaced as a desktop notification, so the background poll alerts the
-	// user once per new request. The tray no longer lists these inline — the
-	// window's Requests view owns approve/deny — so this is the only signal a
-	// request arrived while the window was closed.
-	notifiedGrants map[int64]bool
-	notifiedPerms  map[int64]bool
+	// grantBatch / permBatch track which pending request IDs have already
+	// been surfaced as a desktop notification, and debounce new arrivals so a
+	// burst (e.g. an app requesting many characters at once) yields a single
+	// notification. The tray no longer lists these inline — the window's
+	// Requests view owns approve/deny — so this is the only signal a request
+	// arrived while the window was closed.
+	grantBatch *notifyBatcher
+	permBatch  *notifyBatcher
 }
 
 func New(st *store.Store, srv *server.Server, network Network, updater *update.Updater, log *slog.Logger, port int, onCocoaReady, onOpenWindow func()) *Tray {
 	return &Tray{
-		updater:        updater,
-		st:             st,
-		srv:            srv,
-		network:        network,
-		log:            log,
-		port:           port,
-		onCocoaReady:   onCocoaReady,
-		onOpenWindow:   onOpenWindow,
-		notifiedGrants: make(map[int64]bool),
-		notifiedPerms:  make(map[int64]bool),
+		updater:      updater,
+		st:           st,
+		srv:          srv,
+		network:      network,
+		log:          log,
+		port:         port,
+		onCocoaReady: onCocoaReady,
+		onOpenWindow: onOpenWindow,
+		grantBatch:   newNotifyBatcher(notifyQuiet, notifyMaxWait),
+		permBatch:    newNotifyBatcher(notifyQuiet, notifyMaxWait),
 	}
 }
 
@@ -184,23 +185,33 @@ func (t *Tray) notifyNewGrants() {
 		return
 	}
 
-	seen := make(map[int64]bool, len(pending))
-	for _, p := range pending {
-		seen[p.ID] = true
-		if t.notifiedGrants[p.ID] {
-			continue
-		}
-		t.notifiedGrants[p.ID] = true
-		notify.Send(t.log, "ESI Bridge: access request",
-			fmt.Sprintf("%s wants access to %s", p.ApplicationName, p.CharacterName))
+	byID := make(map[int64]store.PendingGrant, len(pending))
+	ids := make([]int64, len(pending))
+	for i, p := range pending {
+		ids[i] = p.ID
+		byID[p.ID] = p
 	}
-	// Forget IDs that are no longer pending (approved/denied), so the map
-	// doesn't grow without bound over a long-running session.
-	for id := range t.notifiedGrants {
-		if !seen[id] {
-			delete(t.notifiedGrants, id)
-		}
+	batch := t.grantBatch.observe(ids, time.Now())
+	if len(batch) == 0 {
+		return
 	}
+	reqs := make([]store.PendingGrant, len(batch))
+	for i, id := range batch {
+		reqs[i] = byID[id]
+	}
+	notify.Send(t.log, "ESI Bridge: access request", describeGrants(reqs))
+}
+
+// describeGrants summarizes one batch of new access requests for a single
+// notification.
+func describeGrants(reqs []store.PendingGrant) string {
+	if len(reqs) == 1 {
+		return fmt.Sprintf("%s wants access to %s", reqs[0].ApplicationName, reqs[0].CharacterName)
+	}
+	if app, ok := sameApp(reqs, func(r store.PendingGrant) string { return r.ApplicationName }); ok {
+		return fmt.Sprintf("%s wants access to %d characters", app, len(reqs))
+	}
+	return fmt.Sprintf("%d new access requests are waiting", len(reqs))
 }
 
 func (t *Tray) notifyNewPermissions() {
@@ -210,21 +221,45 @@ func (t *Tray) notifyNewPermissions() {
 		return
 	}
 
-	seen := make(map[int64]bool, len(pending))
-	for _, p := range pending {
-		seen[p.ID] = true
-		if t.notifiedPerms[p.ID] {
-			continue
-		}
-		t.notifiedPerms[p.ID] = true
-		notify.Send(t.log, "ESI Bridge: permission request",
-			fmt.Sprintf("%s wants to %s", p.ApplicationName, describePermission(p.Permission)))
+	byID := make(map[int64]store.PendingAppPermission, len(pending))
+	ids := make([]int64, len(pending))
+	for i, p := range pending {
+		ids[i] = p.ID
+		byID[p.ID] = p
 	}
-	for id := range t.notifiedPerms {
-		if !seen[id] {
-			delete(t.notifiedPerms, id)
+	batch := t.permBatch.observe(ids, time.Now())
+	if len(batch) == 0 {
+		return
+	}
+	reqs := make([]store.PendingAppPermission, len(batch))
+	for i, id := range batch {
+		reqs[i] = byID[id]
+	}
+	notify.Send(t.log, "ESI Bridge: permission request", describePermissions(reqs))
+}
+
+// describePermissions summarizes one batch of new permission requests for a
+// single notification.
+func describePermissions(reqs []store.PendingAppPermission) string {
+	if len(reqs) == 1 {
+		return fmt.Sprintf("%s wants to %s", reqs[0].ApplicationName, describePermission(reqs[0].Permission))
+	}
+	if app, ok := sameApp(reqs, func(r store.PendingAppPermission) string { return r.ApplicationName }); ok {
+		return fmt.Sprintf("%s is requesting %d permissions", app, len(reqs))
+	}
+	return fmt.Sprintf("%d new permission requests are waiting", len(reqs))
+}
+
+// sameApp reports the application name shared by every request, if there is
+// one.
+func sameApp[T any](reqs []T, name func(T) string) (string, bool) {
+	app := name(reqs[0])
+	for _, r := range reqs[1:] {
+		if name(r) != app {
+			return "", false
 		}
 	}
+	return app, true
 }
 
 func (t *Tray) onAddCharacter() {

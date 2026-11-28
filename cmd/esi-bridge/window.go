@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/browser"
-	"github.com/BOS-Development/esi-proxy/internal/window"
+	"github.com/BOS-Development/esi-bridge/internal/browser"
+	"github.com/BOS-Development/esi-bridge/internal/window"
 )
 
 // runWindow is the entry point for the `--window` child invocation: it hosts
@@ -35,7 +35,7 @@ func runWindow(args []string) error {
 // windowLauncher opens and tracks the management window child process on
 // behalf of the main (tray + server) process. The window can't share the
 // tray's process because both need the single main-thread native run loop, so
-// it's spawned as `esi-proxy --window --url …` of this same binary.
+// it's spawned as `esi-bridge --window --url …` of this same binary.
 type windowLauncher struct {
 	exe  string
 	port int

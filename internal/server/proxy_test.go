@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/cache"
-	"github.com/BOS-Development/esi-proxy/internal/cryptox"
-	"github.com/BOS-Development/esi-proxy/internal/db"
-	"github.com/BOS-Development/esi-proxy/internal/esi"
-	"github.com/BOS-Development/esi-proxy/internal/server"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/cache"
+	"github.com/BOS-Development/esi-bridge/internal/cryptox"
+	"github.com/BOS-Development/esi-bridge/internal/db"
+	"github.com/BOS-Development/esi-bridge/internal/esi"
+	"github.com/BOS-Development/esi-bridge/internal/server"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
 )
 
 const testCharacterID = 999
@@ -197,5 +197,53 @@ func TestProxyRejectsMissingAPIKey(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", resp.StatusCode)
+	}
+}
+
+// TestProxyReportsReauthRequired checks that once a character is flagged as
+// needing to log in again and its access token has run out, the proxy answers
+// 409 with an explanation instead of trying to refresh.
+func TestProxyReportsReauthRequired(t *testing.T) {
+	ts, st, esiCalls := newTestServer(t)
+	appID, apiKey := registerApp(t, ts, "Pyfa")
+	if err := st.UpsertPendingGrant(appID, testCharacterID, []string{"esi-assets.read_assets.v1"}); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := st.ListPendingGrants()
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("ListPendingGrants: %d, %v", len(pending), err)
+	}
+	if err := st.ApprovePendingGrant(pending[0].ID); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := st.GetCharacter(testCharacterID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.AccessTokenExpiresAt = time.Now().Add(-time.Hour)
+	if err := st.UpsertCharacter(c); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetCharacterReauth(testCharacterID, "grant revoked"); err != nil {
+		t.Fatal(err)
+	}
+
+	r, _ := http.NewRequest(http.MethodGet, ts.URL+"/proxy/999/characters/999/assets/", nil)
+	r.Header.Set("X-Proxy-Api-Key", apiKey)
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatalf("proxy request: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d (%s), want 409", resp.StatusCode, body)
+	}
+	if !bytes.Contains(body, []byte("logged in again")) {
+		t.Fatalf("body = %q, want a re-login explanation", body)
+	}
+	if got := atomic.LoadInt32(esiCalls); got != 0 {
+		t.Fatalf("esi calls = %d, want 0", got)
 	}
 }

@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
-	"github.com/BOS-Development/esi-proxy/internal/cache"
-	"github.com/BOS-Development/esi-proxy/internal/config"
-	"github.com/BOS-Development/esi-proxy/internal/esi"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
-	"github.com/BOS-Development/esi-proxy/internal/update"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/cache"
+	"github.com/BOS-Development/esi-bridge/internal/config"
+	"github.com/BOS-Development/esi-bridge/internal/esi"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/update"
 )
 
 type Server struct {
@@ -65,7 +65,7 @@ func New(s *store.Store, sso *esi.SSOHolder, esiClient *esi.Client, c *cache.Cac
 	if err != nil {
 		// crypto/rand failure is catastrophic and essentially never happens;
 		// there is no safe fallback for a session secret, so fail loudly.
-		panic("esi-proxy: generate session token: " + err.Error())
+		panic("esi-bridge: generate session token: " + err.Error())
 	}
 	return &Server{
 		store:        s,
@@ -117,7 +117,17 @@ func (s *Server) updateClientIDConfig(edit func(cfg *config.Config)) error {
 	if err := config.Save(s.dataDir, cfg); err != nil {
 		return err
 	}
+	prev := s.sso.Get().ClientID()
 	s.sso.Set(esi.NewSSO(cfg.ClientID(), s.ssoBaseURL, s.redirectURL, LoginScopes))
+	if cfg.ClientID() != prev {
+		// Characters flagged for re-authorization under the old client get a
+		// fresh attempt under the new one. Those whose tokens are known to
+		// belong to another client are caught by the client_id check without
+		// calling SSO; the rest (unknown client) may simply work again.
+		if err := s.store.ClearAllCharacterReauth(); err != nil {
+			s.log.Warn("clear character re-authorization flags", "error", err)
+		}
+	}
 	return nil
 }
 
@@ -168,7 +178,7 @@ func (s *Server) SetRebinder(rebind func(host string) error) {
 
 // SetBindHost persists a new bind host to config.json. It only saves the
 // setting: the listener itself is rebound live by the caller (see the
-// network type in cmd/esi-proxy), which calls this once the rebind succeeds.
+// network type in cmd/esi-bridge), which calls this once the rebind succeeds.
 func (s *Server) SetBindHost(host string) error {
 	s.cfgMu.Lock()
 	defer s.cfgMu.Unlock()
