@@ -2,10 +2,13 @@ package db
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
 	"testing"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
 )
 
 // TestMigrateAddsTokensUpdatedAt simulates upgrading a pre-existing database
@@ -13,7 +16,7 @@ import (
 // backfill existing rows from created_at rather than failing.
 func TestMigrateAddsTokensUpdatedAt(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "esi-proxy.db")
+	path := filepath.Join(dir, FileName())
 
 	// Create an "old" database whose characters table lacks tokens_updated_at.
 	old, err := sql.Open("sqlite", "file:"+path)
@@ -68,7 +71,7 @@ func TestMigrateAddsTokensUpdatedAt(t *testing.T) {
 // client_id and reauth_reason, defaulting to empty strings for existing rows.
 func TestMigrateAddsReauthColumns(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "esi-proxy.db")
+	path := filepath.Join(dir, FileName())
 
 	old, err := sql.Open("sqlite", "file:"+path)
 	if err != nil {
@@ -106,5 +109,27 @@ func TestMigrateAddsReauthColumns(t *testing.T) {
 	}
 	if clientID != "" || reason != "" {
 		t.Fatalf("client_id = %q, reauth_reason = %q; want both empty", clientID, reason)
+	}
+}
+
+// TestFileNameMatchesBuild checks that development builds (which tests are,
+// unless run with -tags release) use the separate -dev database.
+func TestFileNameMatchesBuild(t *testing.T) {
+	want := "esi-proxy.db"
+	if buildinfo.Dev {
+		want = "esi-proxy-dev.db"
+	}
+	if got := FileName(); got != want {
+		t.Fatalf("FileName() = %q, want %q", got, want)
+	}
+
+	dir := t.TempDir()
+	conn, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	conn.Close()
+	if _, err := os.Stat(filepath.Join(dir, want)); err != nil {
+		t.Fatalf("database not created at %s: %v", want, err)
 	}
 }

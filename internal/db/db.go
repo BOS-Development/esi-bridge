@@ -8,15 +8,28 @@ import (
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
 )
 
 //go:embed schema.sql
 var schema string
 
+// FileName is the database's file name within the data directory.
+// Development builds use their own database ("esi-proxy-dev.db"), so
+// running one never touches the characters, grants or schema of a release
+// install sharing the same data directory.
+func FileName() string {
+	if buildinfo.Dev {
+		return "esi-proxy-dev.db"
+	}
+	return "esi-proxy.db"
+}
+
 // Open opens (creating if necessary) the SQLite database in dataDir and
 // applies the schema. The returned *sql.DB is safe for concurrent use.
 func Open(dataDir string) (*sql.DB, error) {
-	path := filepath.Join(dataDir, "esi-proxy.db")
+	path := filepath.Join(dataDir, FileName())
 
 	dsn := fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", path)
 	conn, err := sql.Open("sqlite", dsn)
