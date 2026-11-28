@@ -34,9 +34,9 @@ ESI Bridge is a single Go binary with a desktop app window (backed by a small ba
 
 ### Installing a release
 
-Every push to `main` publishes installers on the [Releases](https://github.com/BOS-Development/esi-proxy/releases) page, built with the project's EVE SSO Client ID:
+Every push to `main` publishes installers on the [Releases](https://github.com/BOS-Development/esi-bridge/releases) page, built with the project's EVE SSO Client ID:
 
-* **Windows** — `esi-bridge-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-proxy`.
+* **Windows** — `esi-bridge-<version>-windows-x64-setup.exe`. Installs for the current user (no admin prompt), adds a Start menu shortcut, and optionally a desktop shortcut and start-at-sign-in. Needs the WebView2 runtime, which current Windows 10/11 already has. The installer isn't code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**. Uninstalling keeps your accounts and tokens in `%APPDATA%\esi-bridge`.
 * **macOS** — `esi-bridge-<version>-macos-universal.dmg` (Apple Silicon and Intel, macOS 11+). Open it and drag **ESI Bridge** into **Applications**. The app isn't notarized yet, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
 #### Updates
@@ -55,7 +55,7 @@ ESI Bridge ships with a built-in EVE SSO application, so you can skip this step.
 
 Copy the generated **Client ID**. Characters are tied to the Client ID they were added with, so pick one before adding characters (switching later means re-adding them).
 
-The built-in Client ID is injected at build time: the `scripts/build-*` scripts read it from a `.clientid` file at the repo root (gitignored — create it with just the Client ID inside) and pass it to `go build` as `-ldflags "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=<id>"`. Without that file the build has no bundled ID, and users must set a custom one.
+The built-in Client ID is injected at build time: the `scripts/build-*` scripts read it from a `.clientid` file at the repo root (gitignored — create it with just the Client ID inside) and pass it to `go build` as `-ldflags "-X github.com/BOS-Development/esi-bridge/internal/buildinfo.BundledClientID=<id>"`. Without that file the build has no bundled ID, and users must set a custom one.
 
 ### 2. Build and run
 
@@ -70,14 +70,14 @@ platform's native webview, and the tray/menu-bar presence is native too.
 
 ```powershell
 .\scripts\build-windows.ps1
-.\esi-proxy.exe
+.\esi-bridge.exe
 ```
 
 **Linux:**
 
 ```sh
 ./scripts/build-linux.sh
-./esi-proxy
+./esi-bridge
 ```
 
 **macOS:** custom URL schemes can only be routed to a proper `.app` bundle — Launch Services has no way to associate one with a bare binary — so build and run via:
@@ -87,19 +87,19 @@ platform's native webview, and the tray/menu-bar presence is native too.
 open "ESI Bridge.app"
 ```
 
-(`go build -o esi-proxy ./cmd/esi-proxy && ./esi-proxy` still works fine on macOS for everything *except* SSO login, which needs the bundle.)
+(`go build -o esi-bridge ./cmd/esi-bridge && ./esi-bridge` still works fine on macOS for everything *except* SSO login, which needs the bundle.)
 
-The Windows and Linux scripts are thin wrappers around `go build -o esi-proxy[.exe] ./cmd/esi-proxy` — feel free to invoke that directly instead.
+The Windows and Linux scripts are thin wrappers around `go build -o esi-bridge[.exe] ./cmd/esi-bridge` — feel free to invoke that directly instead.
 
-The app icon lives in `internal/assets/` (`bridge.ico`, `bridge.png`) and is embedded into the tray, notifications and UI. The Windows exe icon comes from the committed `cmd/esi-proxy/rsrc_windows_amd64.syso`; after changing `bridge.ico`, regenerate it with `scripts/gen-winres.sh` (needs `windres` from MinGW/MSYS2).
+The app icon lives in `internal/assets/` (`bridge.ico`, `bridge.png`) and is embedded into the tray, notifications and UI. The Windows exe icon comes from the committed `cmd/esi-bridge/rsrc_windows_amd64.syso`; after changing `bridge.ico`, regenerate it with `scripts/gen-winres.sh` (needs `windres` from MinGW/MSYS2).
 
-Builds are **development builds** by default: they add a **Developer** section to the Settings tab, which can send a test desktop notification. For a **production release**, add the `release` build tag (`go build -tags release ./cmd/esi-proxy`, or `-Release` / `RELEASE=1` with the scripts), which leaves the Developer section out.
+Builds are **development builds** by default: they add a **Developer** section to the Settings tab, which can send a test desktop notification. For a **production release**, add the `release` build tag (`go build -tags release ./cmd/esi-bridge`, or `-Release` / `RELEASE=1` with the scripts), which leaves the Developer section out.
 
 The **ESI Bridge** window opens (and a tray/menu-bar icon appears in the background; closing the window leaves the app running there, and **Open ESI Bridge** in that menu re-opens it). If you registered your own application in step 1, open **Settings**, tick **Use a custom EVE SSO Client ID**, and paste its Client ID — it's saved and takes effect immediately, no restart needed. Then use **Add Character** to log in via EVE SSO. Note your browser will likely show a one-time "Open ESI Bridge?" permission prompt during SSO login — that's expected custom-scheme behavior, not a bug — and afterwards the character appears in the window.
 
 The management UI is served over a loopback-only HTTP endpoint, so it also remains reachable in a browser at `http://localhost:8085/app` if you prefer that.
 
-(Config lives in a file the app manages for you — macOS: `~/Library/Application Support/esi-proxy/config.json`, Linux: `~/.config/esi-proxy/config.json`, Windows: `%AppData%\esi-proxy\config.json` — you shouldn't need to touch it directly.)
+(Config lives in a file the app manages for you — macOS: `~/Library/Application Support/esi-bridge/config.json`, Linux: `~/.config/esi-bridge/config.json`, Windows: `%AppData%\esi-bridge\config.json` — you shouldn't need to touch it directly.)
 
 ### 3. Point an external application at the proxy
 
@@ -139,8 +139,8 @@ By default the proxy binds to `localhost`, so only applications **on the same ma
 ### Copying tokens to another computer
 
 ```sh
-./esi-proxy export --out=bundle.enc     # prompts for a passphrase
-./esi-proxy import --in=bundle.enc      # on the other machine, same passphrase
+./esi-bridge export --out=bundle.enc     # prompts for a passphrase
+./esi-bridge import --in=bundle.enc      # on the other machine, same passphrase
 ```
 
 On an installed Windows copy, run these with `esi-bridge-cli.exe` from the install folder (`%LOCALAPPDATA%\Programs\ESI Bridge`). The main `esi-bridge.exe` there is built without a console, so it can't prompt for a passphrase.

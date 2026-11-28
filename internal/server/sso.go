@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/BOS-Development/esi-proxy/internal/notify"
+	"github.com/BOS-Development/esi-bridge/internal/notify"
 )
 
 // LoginScopes is the fixed set of ESI scopes requested for every character
@@ -123,7 +123,7 @@ func randomState() (string, error) {
 // browser (the old http://localhost/sso/callback redirect_uri) or — now
 // that the redirect_uri is the eveauth-proxy:// custom scheme — by a local
 // forwarder replaying the callback URL's query string here (see
-// runForwardCallback/forwardCallback in cmd/esi-proxy). Since the browser
+// runForwardCallback/forwardCallback in cmd/esi-bridge). Since the browser
 // generally can't render anything meaningful once a custom-scheme handoff
 // has happened, a desktop notification is fired in addition to (not
 // instead of) the HTML response, so the user gets feedback either way.

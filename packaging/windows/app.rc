@@ -2,6 +2,6 @@
 //
 // ID 32512 is IDI_APPLICATION, which the webview window loads from the
 // module for its title bar / taskbar icon; Explorer also shows it as the exe
-// icon. Regenerate cmd/esi-proxy/rsrc_windows_amd64.syso after changing it
+// icon. Regenerate cmd/esi-bridge/rsrc_windows_amd64.syso after changing it
 // with scripts/gen-winres.sh.
 32512 ICON "../../internal/assets/bridge.ico"

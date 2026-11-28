@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
-	"github.com/BOS-Development/esi-proxy/internal/update"
-	"github.com/BOS-Development/esi-proxy/internal/webui"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/update"
+	"github.com/BOS-Development/esi-bridge/internal/webui"
 )
 
 // The management UI is served to the app window (and a browser in

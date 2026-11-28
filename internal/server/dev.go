@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/BOS-Development/esi-proxy/internal/notify"
+	"github.com/BOS-Development/esi-bridge/internal/notify"
 )
 
 // Developer-only /manage endpoints. They are registered only in development

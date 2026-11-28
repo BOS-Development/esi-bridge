@@ -35,8 +35,8 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=BOS Development
-AppPublisherURL=https://github.com/BOS-Development/esi-proxy
-AppSupportURL=https://github.com/BOS-Development/esi-proxy/issues
+AppPublisherURL=https://github.com/BOS-Development/esi-bridge
+AppSupportURL=https://github.com/BOS-Development/esi-bridge/issues
 VersionInfoVersion={#AppVersion}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
@@ -119,5 +119,5 @@ end;
 
 [UninstallRun]
 ; Stop the running tray app so its files can be removed. User data in
-; %APPDATA%\esi-proxy (accounts, tokens) is intentionally left in place.
+; %APPDATA%\esi-bridge (accounts, tokens) is intentionally left in place.
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM {#AppExe}"; Flags: runhidden; RunOnceId: "StopESIBridge"

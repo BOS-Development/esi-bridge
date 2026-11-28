@@ -1,4 +1,4 @@
-module github.com/BOS-Development/esi-proxy
+module github.com/BOS-Development/esi-bridge
 
 go 1.26.6
 

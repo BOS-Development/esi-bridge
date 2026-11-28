@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
 )
 
 var tokenRe = regexp.MustCompile(`name="session-token" content="([0-9a-f]+)"`)

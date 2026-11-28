@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
 )
 
 const (

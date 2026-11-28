@@ -2,7 +2,7 @@
 # Builds ESI Bridge.app — required on macOS for eveauth-proxy:// login to
 # work at all: Launch Services can only route a custom URL scheme to a
 # proper .app bundle (CFBundleURLTypes in Info.plist), never to a bare
-# binary. `go build -o esi-proxy ./cmd/esi-proxy && ./esi-proxy` still runs
+# binary. `go build -o esi-bridge ./cmd/esi-bridge && ./esi-bridge` still runs
 # fine for everything else, but SSO login will fail until it's launched via
 # this bundle at least once.
 set -euo pipefail
@@ -11,7 +11,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 APP_NAME="ESI Bridge"
 APP_DIR="${APP_NAME}.app"
-BUNDLE_ID="dev.bos-development.esi-proxy"
+BUNDLE_ID="dev.bos-development.esi-bridge"
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
@@ -50,7 +50,7 @@ if [[ -f .clientid ]]; then
 		echo "error: .clientid must contain only the EVE SSO Client ID (letters and digits)" >&2
 		exit 1
 	fi
-	LDFLAGS="${LDFLAGS} -X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=${CLIENT_ID}"
+	LDFLAGS="${LDFLAGS} -X github.com/BOS-Development/esi-bridge/internal/buildinfo.BundledClientID=${CLIENT_ID}"
 else
 	echo "warning: no .clientid file; building without a bundled Client ID (users must set a custom one)" >&2
 fi
@@ -71,7 +71,7 @@ if [[ -n "${VERSION:-}" ]]; then
 		echo "error: VERSION must be numeric, e.g. 1.0.42 (got '$VERSION')" >&2
 		exit 1
 	fi
-	LDFLAGS="${LDFLAGS} -X github.com/BOS-Development/esi-proxy/internal/buildinfo.Version=${VERSION}"
+	LDFLAGS="${LDFLAGS} -X github.com/BOS-Development/esi-bridge/internal/buildinfo.Version=${VERSION}"
 fi
 VERSION="${VERSION:-1.0}"
 
@@ -85,12 +85,12 @@ if [[ "${UNIVERSAL:-}" == "1" ]]; then
 	# forced on; Apple's clang targets either arch via the -arch flag Go passes.
 	for arch in arm64 amd64; do
 		CGO_ENABLED=1 GOOS=darwin GOARCH="$arch" \
-			go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$BIN-$arch" ./cmd/esi-proxy
+			go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$BIN-$arch" ./cmd/esi-bridge
 	done
 	lipo -create -output "$BIN" "$BIN-arm64" "$BIN-amd64"
 	rm -f "$BIN-arm64" "$BIN-amd64"
 else
-	go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$BIN" ./cmd/esi-proxy
+	go build ${TAGS_ARG} -ldflags "${LDFLAGS}" -o "$BIN" ./cmd/esi-bridge
 fi
 
 cat > "$APP_DIR/Contents/Info.plist" << PLIST

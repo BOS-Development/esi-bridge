@@ -51,8 +51,8 @@ func TestNewerReleasePicksPlatformAsset(t *testing.T) {
 		TagName: "v1.0.50",
 		HTMLURL: "https://github.com/x/y/releases/tag/v1.0.50",
 		Assets: []ghAsset{
-			{Name: "esi-proxy-1.0.50-macos-universal.dmg", BrowserDownloadURL: "https://dl/mac", Size: 10, Digest: "sha256:AA"},
-			{Name: "esi-proxy-1.0.50-windows-x64-setup.exe", BrowserDownloadURL: "https://dl/win", Size: 20, Digest: "sha256:bb"},
+			{Name: "esi-bridge-1.0.50-macos-universal.dmg", BrowserDownloadURL: "https://dl/mac", Size: 10, Digest: "sha256:AA"},
+			{Name: "esi-bridge-1.0.50-windows-x64-setup.exe", BrowserDownloadURL: "https://dl/win", Size: 20, Digest: "sha256:bb"},
 		},
 	}
 	cur, _ := parseVersion("1.0.49")
@@ -95,7 +95,7 @@ func fakeGitHub(t *testing.T, tag string, payload []byte, digest string) *httpte
 			TagName: tag,
 			HTMLURL: ts.URL + "/release",
 			Assets: []ghAsset{{
-				Name:               "esi-proxy-" + strings.TrimPrefix(tag, "v") + "-windows-x64-setup.exe",
+				Name:               "esi-bridge-" + strings.TrimPrefix(tag, "v") + "-windows-x64-setup.exe",
 				BrowserDownloadURL: ts.URL + "/asset",
 				Size:               int64(len(payload)),
 				Digest:             digest,

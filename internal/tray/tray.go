@@ -15,11 +15,11 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/BOS-Development/esi-proxy/internal/browser"
-	"github.com/BOS-Development/esi-proxy/internal/notify"
-	"github.com/BOS-Development/esi-proxy/internal/server"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/update"
+	"github.com/BOS-Development/esi-bridge/internal/browser"
+	"github.com/BOS-Development/esi-bridge/internal/notify"
+	"github.com/BOS-Development/esi-bridge/internal/server"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/update"
 )
 
 const refreshInterval = 3 * time.Second

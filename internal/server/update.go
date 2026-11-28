@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
-	"github.com/BOS-Development/esi-proxy/internal/config"
-	"github.com/BOS-Development/esi-proxy/internal/update"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/config"
+	"github.com/BOS-Development/esi-bridge/internal/update"
 )
 
 // SetUpdater wires in the auto-updater behind the /manage/update endpoints.

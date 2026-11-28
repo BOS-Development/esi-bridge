@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/store"
 )
 
 func TestNotifyBatcherCoalescesBurst(t *testing.T) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the ESI Bridge binary (esi-proxy) for Linux.
+# Builds the ESI Bridge binary (esi-bridge) for Linux.
 #
 # Requires a C toolchain (CGO): the app window embeds the native WebKitGTK
 # webview and the menu-bar/tray presence is native too. Install the dev
@@ -28,15 +28,15 @@ if [[ -f .clientid ]]; then
 		echo "error: .clientid must contain only the EVE SSO Client ID (letters and digits)" >&2
 		exit 1
 	fi
-	LDFLAGS="-X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=${CLIENT_ID}"
+	LDFLAGS="-X github.com/BOS-Development/esi-bridge/internal/buildinfo.BundledClientID=${CLIENT_ID}"
 else
 	echo "warning: no .clientid file; building without a bundled Client ID (users must set a custom one)" >&2
 fi
 
-CGO_ENABLED=1 go build "${TAGS[@]}" -ldflags "$LDFLAGS" -o esi-proxy ./cmd/esi-proxy
+CGO_ENABLED=1 go build "${TAGS[@]}" -ldflags "$LDFLAGS" -o esi-bridge ./cmd/esi-bridge
 
 if [[ "${RELEASE:-}" == "1" ]]; then
-	echo "Built esi-proxy (release build)"
+	echo "Built esi-bridge (release build)"
 else
-	echo "Built esi-proxy (development build)"
+	echo "Built esi-bridge (development build)"
 fi

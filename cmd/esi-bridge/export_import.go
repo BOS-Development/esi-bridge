@@ -9,10 +9,10 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/BOS-Development/esi-proxy/internal/config"
-	"github.com/BOS-Development/esi-proxy/internal/cryptox"
-	"github.com/BOS-Development/esi-proxy/internal/db"
-	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/config"
+	"github.com/BOS-Development/esi-bridge/internal/cryptox"
+	"github.com/BOS-Development/esi-bridge/internal/db"
+	"github.com/BOS-Development/esi-bridge/internal/store"
 )
 
 // saltSize must match cryptox.NewSalt's output length.
