@@ -12,7 +12,7 @@ import (
 )
 
 // bundlePath returns the .app bundle the running binary lives in
-// (…/ESI Bridge.app/Contents/MacOS/esi-proxy → …/ESI Bridge.app).
+// (…/ESI Bridge.app/Contents/MacOS/esi-bridge → …/ESI Bridge.app).
 func bundlePath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -40,7 +40,7 @@ func canSelfInstall() (bool, string) {
 	}
 	// Swapping the bundle means renaming it, which needs write access to
 	// the folder it's in.
-	probe, err := os.CreateTemp(filepath.Dir(bundle), ".esi-proxy-update-probe-*")
+	probe, err := os.CreateTemp(filepath.Dir(bundle), ".esi-bridge-update-probe-*")
 	if err != nil {
 		return false, "ESI Bridge can't write to " + filepath.Dir(bundle) + ", so it can't update itself. Download the new version from the release page."
 	}
@@ -61,7 +61,7 @@ func platformInstall(dmg string) error {
 	parent := filepath.Dir(bundle)
 	pid := strconv.Itoa(os.Getpid())
 
-	mount, err := os.MkdirTemp("", "esi-proxy-dmg-")
+	mount, err := os.MkdirTemp("", "esi-bridge-dmg-")
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func platformInstall(dmg string) error {
 
 	// Copy onto the same volume as the installed bundle first, so the swap
 	// below is two atomic renames. ditto keeps the code signature intact.
-	staged := filepath.Join(parent, ".esi-proxy-update-"+pid+".app")
+	staged := filepath.Join(parent, ".esi-bridge-update-"+pid+".app")
 	os.RemoveAll(staged)
 	out, err := exec.Command("ditto", apps[0], staged).CombinedOutput()
 	detach()
@@ -89,7 +89,7 @@ func platformInstall(dmg string) error {
 		return fmt.Errorf("copy new version: %v: %s", err, strings.TrimSpace(string(out)))
 	}
 
-	backup := filepath.Join(parent, ".esi-proxy-old-"+pid+".app")
+	backup := filepath.Join(parent, ".esi-bridge-old-"+pid+".app")
 	if err := os.Rename(bundle, backup); err != nil {
 		os.RemoveAll(staged)
 		return fmt.Errorf("move old version aside: %w", err)

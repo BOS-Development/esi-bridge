@@ -11,7 +11,7 @@ import (
 
 // register writes HKCU\Software\Classes\eveauth-proxy so Windows routes
 // eveauth-proxy:// URLs to this executable, spawning a new process with the
-// URL as argv[1] (handled by the forwarder-mode branch in cmd/esi-proxy).
+// URL as argv[1] (handled by the forwarder-mode branch in cmd/esi-bridge).
 // Idempotent — safe to call on every startup.
 func register() error {
 	exe, err := os.Executable()

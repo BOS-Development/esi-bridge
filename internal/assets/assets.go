@@ -2,7 +2,7 @@
 // of the app (tray, notifications, management UI) uses the same files.
 //
 // bridge.ico and bridge.png here are also the source for the Windows exe
-// resource (cmd/esi-proxy/rsrc_windows_*.syso, see scripts/gen-winres.ps1),
+// resource (cmd/esi-bridge/rsrc_windows_*.syso, see scripts/gen-winres.ps1),
 // the installer icon and the macOS app icon.
 package assets
 

@@ -13,7 +13,7 @@ import (
 )
 
 // innoUninstallKey is where Inno Setup records the install. The GUID is the
-// AppId in packaging/windows/esi-proxy.iss; keep them in step.
+// AppId in packaging/windows/esi-bridge.iss; keep them in step.
 const innoUninstallKey = `Software\Microsoft\Windows\CurrentVersion\Uninstall\{2642D8DA-C1C0-42A3-92C2-037FF57CE3DE}_is1`
 
 // canSelfInstall reports whether the running exe is the one the installer
@@ -47,7 +47,7 @@ func canSelfInstall() (bool, string) {
 // once it's running; the caller then quits so the installer can replace the
 // files. /SILENT shows only a progress window, and reuses the existing install
 // folder and options. /RELAUNCH=1 makes the installer start the new version
-// when it's done (see ShouldRelaunch in esi-proxy.iss).
+// when it's done (see ShouldRelaunch in esi-bridge.iss).
 func platformInstall(path string) error {
 	logPath := filepath.Join(filepath.Dir(path), "install.log")
 	cmd := exec.Command(path,

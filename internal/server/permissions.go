@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/store"
 )
 
 type requestPermissionsRequest struct {

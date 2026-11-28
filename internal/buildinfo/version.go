@@ -3,7 +3,7 @@ package buildinfo
 // Version is the release version this binary was built as, e.g. "1.0.42".
 // The packaging scripts inject it at build time with
 //
-//	-ldflags "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.Version=1.0.42"
+//	-ldflags "-X github.com/BOS-Development/esi-bridge/internal/buildinfo.Version=1.0.42"
 //
 // It's empty for local builds that weren't given a version; the auto-updater
 // treats those as unversioned and never offers them an update.

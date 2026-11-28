@@ -9,7 +9,7 @@
 // The webview owns the process's main thread run loop (on macOS, Cocoa's), the
 // same thread the system tray needs. Those two can't share one process, so the
 // window runs as a separate child process (the parent's `--window` invocation
-// of the same binary); see cmd/esi-proxy. The loopback server it points at
+// of the same binary); see cmd/esi-bridge. The loopback server it points at
 // stays fully reachable from a browser — the window is an additional surface,
 // not a replacement.
 package window

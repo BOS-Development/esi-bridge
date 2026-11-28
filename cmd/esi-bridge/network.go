@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/discovery"
+	"github.com/BOS-Development/esi-bridge/internal/discovery"
 )
 
 // lanIPCheckInterval is how often the LAN address is re-checked while the

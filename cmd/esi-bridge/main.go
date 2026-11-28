@@ -1,4 +1,4 @@
-// Command esi-proxy (ESI Bridge) runs a local proxy for EVE Online's ESI API: it holds
+// Command esi-bridge (ESI Bridge) runs a local proxy for EVE Online's ESI API: it holds
 // character SSO tokens, caches ESI responses, and gates external
 // applications behind a user approval flow. See README.md.
 package main
@@ -15,20 +15,20 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/buildinfo"
-	"github.com/BOS-Development/esi-proxy/internal/cache"
-	"github.com/BOS-Development/esi-proxy/internal/config"
-	"github.com/BOS-Development/esi-proxy/internal/cryptox"
-	"github.com/BOS-Development/esi-proxy/internal/db"
-	"github.com/BOS-Development/esi-proxy/internal/esi"
-	"github.com/BOS-Development/esi-proxy/internal/notify"
-	"github.com/BOS-Development/esi-proxy/internal/server"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
-	"github.com/BOS-Development/esi-proxy/internal/tray"
-	"github.com/BOS-Development/esi-proxy/internal/update"
-	"github.com/BOS-Development/esi-proxy/internal/urlscheme"
-	"github.com/BOS-Development/esi-proxy/internal/worker"
+	"github.com/BOS-Development/esi-bridge/internal/buildinfo"
+	"github.com/BOS-Development/esi-bridge/internal/cache"
+	"github.com/BOS-Development/esi-bridge/internal/config"
+	"github.com/BOS-Development/esi-bridge/internal/cryptox"
+	"github.com/BOS-Development/esi-bridge/internal/db"
+	"github.com/BOS-Development/esi-bridge/internal/esi"
+	"github.com/BOS-Development/esi-bridge/internal/notify"
+	"github.com/BOS-Development/esi-bridge/internal/server"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/tray"
+	"github.com/BOS-Development/esi-bridge/internal/update"
+	"github.com/BOS-Development/esi-bridge/internal/urlscheme"
+	"github.com/BOS-Development/esi-bridge/internal/worker"
 )
 
 func main() {
@@ -102,19 +102,19 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`ESI Bridge (esi-proxy) — local proxy for EVE Online's ESI API
+	fmt.Println(`ESI Bridge (esi-bridge) — local proxy for EVE Online's ESI API
 
 Usage:
-  esi-proxy                                  run the proxy (tray + HTTP server)
-  esi-proxy export --out=bundle.enc          export accounts/characters/tokens
-  esi-proxy import --in=bundle.enc           import a bundle onto this machine
-  esi-proxy mdns announce [--duration D]     debug: send the mDNS announcement by hand
-  esi-proxy mdns browse   [--duration D]     debug: discover ESI Bridge services on the LAN
-  esi-proxy version                          print the version
-  esi-proxy serve-ui                         dev: serve the management UI only (no tray), at /app
-  esi-proxy --window --url URL               internal: host the management UI in a native
+  esi-bridge                                  run the proxy (tray + HTTP server)
+  esi-bridge export --out=bundle.enc          export accounts/characters/tokens
+  esi-bridge import --in=bundle.enc           import a bundle onto this machine
+  esi-bridge mdns announce [--duration D]     debug: send the mDNS announcement by hand
+  esi-bridge mdns browse   [--duration D]     debug: discover ESI Bridge services on the LAN
+  esi-bridge version                          print the version
+  esi-bridge serve-ui                         dev: serve the management UI only (no tray), at /app
+  esi-bridge --window --url URL               internal: host the management UI in a native
                                               window (spawned by the running instance)
-  esi-proxy eveauth-proxy://callback?...     internal: invoked by the OS to deliver
+  esi-bridge eveauth-proxy://callback?...     internal: invoked by the OS to deliver
                                               an SSO callback to the running instance`)
 }
 

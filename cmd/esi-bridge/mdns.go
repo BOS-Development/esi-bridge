@@ -14,17 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/config"
-	"github.com/BOS-Development/esi-proxy/internal/discovery"
+	"github.com/BOS-Development/esi-bridge/internal/config"
+	"github.com/BOS-Development/esi-bridge/internal/discovery"
 )
 
 // runMDNS is a debug entry point for exercising mDNS/DNS-SD by hand, separate
 // from the normal `run` path that advertises automatically. It supports two
 // modes:
 //
-//	esi-proxy mdns announce   send the service announcement (and keep answering
+//	esi-bridge mdns announce   send the service announcement (and keep answering
 //	                          queries) for --duration, then withdraw it
-//	esi-proxy mdns browse     listen for ESI Bridge services on the network for
+//	esi-bridge mdns browse     listen for ESI Bridge services on the network for
 //	                          --duration and print what's found
 //
 // announce defaults the port and base_url to the saved config, so it mirrors
@@ -36,7 +36,7 @@ func runMDNS(args []string) error {
 	baseURL := fs.String("base-url", "", "base_url TXT value to advertise (default: derived from the configured bind host and port)")
 	duration := fs.Duration("duration", 15*time.Second, "how long to announce or browse (0 = until Ctrl-C)")
 	fs.Usage = func() {
-		fmt.Fprint(os.Stderr, `usage: esi-proxy mdns <announce|browse> [flags]
+		fmt.Fprint(os.Stderr, `usage: esi-bridge mdns <announce|browse> [flags]
 
   announce   send the mDNS announcement and answer queries
   browse     discover ESI Bridge services on the local network

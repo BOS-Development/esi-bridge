@@ -5,7 +5,7 @@ package window
 import (
 	"runtime"
 
-	"github.com/BOS-Development/esi-proxy/internal/browser"
+	"github.com/BOS-Development/esi-bridge/internal/browser"
 	webview "github.com/webview/webview_go"
 )
 

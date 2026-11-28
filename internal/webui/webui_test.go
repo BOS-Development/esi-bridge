@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BOS-Development/esi-proxy/internal/assets"
+	"github.com/BOS-Development/esi-bridge/internal/assets"
 )
 
 func TestIndexHTMLInjectsSessionToken(t *testing.T) {

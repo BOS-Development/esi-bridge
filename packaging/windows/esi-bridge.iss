@@ -3,7 +3,7 @@
 ; Built by scripts/package-windows.ps1, which compiles the binaries first and
 ; passes these defines on the ISCC command line:
 ;   /DAppVersion=1.2.3        version shown in Apps & Features (digits and dots)
-;   /DBuildDir=<path>         folder holding esi-proxy.exe and esi-proxy-cli.exe
+;   /DBuildDir=<path>         folder holding esi-bridge.exe and esi-bridge-cli.exe
 ;   /DOutputDir=<path>        where the setup .exe is written
 ;
 ; It installs per user (no admin prompt) into %LOCALAPPDATA%\Programs, which
@@ -20,7 +20,11 @@
 #endif
 
 #define AppName "ESI Bridge"
-#define AppExe "esi-proxy.exe"
+#define AppExe "esi-bridge.exe"
+; Names the binaries had in releases before the rename; only used to stop
+; and remove them when upgrading such an install.
+#define LegacyExe "esi-proxy.exe"
+#define LegacyCliExe "esi-proxy-cli.exe"
 #define RepoRoot AddBackslash(SourcePath) + "..\.."
 
 [Setup]
@@ -31,8 +35,8 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=BOS Development
-AppPublisherURL=https://github.com/BOS-Development/esi-proxy
-AppSupportURL=https://github.com/BOS-Development/esi-proxy/issues
+AppPublisherURL=https://github.com/BOS-Development/esi-bridge
+AppSupportURL=https://github.com/BOS-Development/esi-bridge/issues
 VersionInfoVersion={#AppVersion}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
@@ -43,7 +47,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 LicenseFile={#RepoRoot}\LICENSE
 OutputDir={#OutputDir}
-OutputBaseFilename=esi-proxy-{#AppVersion}-windows-x64-setup
+OutputBaseFilename=esi-bridge-{#AppVersion}-windows-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -59,8 +63,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startup"; Description: "Start {#AppName} when I sign in to Windows"; GroupDescription: "Startup:"
 
 [Files]
-Source: "{#BuildDir}\esi-proxy.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#BuildDir}\esi-proxy-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BuildDir}\esi-bridge.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BuildDir}\esi-bridge-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 
 [InstallDelete]
@@ -69,6 +73,10 @@ Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags:
 Type: files; Name: "{autoprograms}\ESI Proxy.lnk"
 Type: files; Name: "{autodesktop}\ESI Proxy.lnk"
 Type: files; Name: "{userstartup}\ESI Proxy.lnk"
+; Binaries from before they were renamed to esi-bridge. PrepareToInstall
+; stops the old exe first so it can be deleted.
+Type: files; Name: "{app}\{#LegacyExe}"
+Type: files; Name: "{app}\{#LegacyCliExe}"
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
@@ -95,7 +103,21 @@ begin
   Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
 end;
 
+// An install from before the rename runs as {#LegacyExe}. CloseApplications
+// only closes programs whose files this setup replaces, which no longer
+// includes that exe, so stop it here or it keeps running (and can't be
+// deleted) alongside the new version.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  if FileExists(ExpandConstant('{app}\{#LegacyExe}')) then
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM {#LegacyExe}', '',
+      SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := '';
+end;
+
 [UninstallRun]
 ; Stop the running tray app so its files can be removed. User data in
-; %APPDATA%\esi-proxy (accounts, tokens) is intentionally left in place.
-Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM {#AppExe}"; Flags: runhidden; RunOnceId: "StopESIProxy"
+; %APPDATA%\esi-bridge (accounts, tokens) is intentionally left in place.
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM {#AppExe}"; Flags: runhidden; RunOnceId: "StopESIBridge"

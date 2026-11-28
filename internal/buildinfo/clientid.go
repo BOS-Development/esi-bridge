@@ -8,7 +8,7 @@ package buildinfo
 // It's injected at build time rather than committed: the scripts/build-*
 // scripts read it from a gitignored .clientid file at the repo root and pass
 //
-//	-ldflags "-X github.com/BOS-Development/esi-proxy/internal/buildinfo.BundledClientID=<id>"
+//	-ldflags "-X github.com/BOS-Development/esi-bridge/internal/buildinfo.BundledClientID=<id>"
 //
 // When it's empty (e.g. a local build with no ID filled in), the app falls
 // back to requiring a custom client_id.

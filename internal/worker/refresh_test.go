@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/cryptox"
-	"github.com/BOS-Development/esi-proxy/internal/db"
-	"github.com/BOS-Development/esi-proxy/internal/esi"
-	"github.com/BOS-Development/esi-proxy/internal/store"
-	"github.com/BOS-Development/esi-proxy/internal/tokens"
+	"github.com/BOS-Development/esi-bridge/internal/cryptox"
+	"github.com/BOS-Development/esi-bridge/internal/db"
+	"github.com/BOS-Development/esi-bridge/internal/esi"
+	"github.com/BOS-Development/esi-bridge/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/tokens"
 )
 
 type fixture struct {

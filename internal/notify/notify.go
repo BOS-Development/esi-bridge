@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/BOS-Development/esi-proxy/internal/assets"
+	"github.com/BOS-Development/esi-bridge/internal/assets"
 	"github.com/gen2brain/beeep"
 )
 

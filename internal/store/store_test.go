@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BOS-Development/esi-proxy/internal/db"
-	"github.com/BOS-Development/esi-proxy/internal/store"
+	"github.com/BOS-Development/esi-bridge/internal/db"
+	"github.com/BOS-Development/esi-bridge/internal/store"
 )
 
 func newStore(t *testing.T) *store.Store {
